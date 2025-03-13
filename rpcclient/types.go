@@ -5,8 +5,8 @@ import (
 )
 
 type BlockHeader struct {
-	Hash       string
-	ParentHash string
-	Number     *big.Int
-	Timestamp  uint64
+	Hash      string
+	PrevHash  string
+	Number    *big.Int
+	Timestamp uint64
 }

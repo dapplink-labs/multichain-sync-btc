@@ -11,10 +11,10 @@ import (
 )
 
 type Blocks struct {
-	Hash       string `gorm:"primaryKey"`
-	ParentHash string
-	Number     *big.Int `gorm:"serializer:u256"`
-	Timestamp  uint64
+	Hash      string `gorm:"primaryKey"`
+	PrevHash  string
+	Number    *big.Int `gorm:"serializer:u256"`
+	Timestamp uint64
 }
 
 func BlockHeaderFromHeader(header *types.Header) rpcclient.BlockHeader {

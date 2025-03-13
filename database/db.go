@@ -18,11 +18,17 @@ import (
 type DB struct {
 	gorm *gorm.DB
 
-	CreateTable CreateTableDB
-	Blocks      BlocksDB
-	Addresses   AddressesDB
-	Balances    BalancesDB
-	Business    BusinessDB
+	CreateTable  CreateTableDB
+	Blocks       BlocksDB
+	Addresses    AddressesDB
+	Balances     BalancesDB
+	Business     BusinessDB
+	Deposits     DepositsDB
+	Withdraws    WithdrawsDB
+	Internals    InternalsDB
+	Transactions TransactionsDB
+	Vins         VinsDB
+	Vouts        VoutsDB
 }
 
 func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
@@ -56,12 +62,18 @@ func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
 	}
 
 	db := &DB{
-		gorm:        gorm,
-		CreateTable: NewCreateTableDB(gorm),
-		Blocks:      NewBlocksDB(gorm),
-		Addresses:   NewAddressesDB(gorm),
-		Balances:    NewBalancesDB(gorm),
-		Business:    NewBusinessDB(gorm),
+		gorm:         gorm,
+		CreateTable:  NewCreateTableDB(gorm),
+		Blocks:       NewBlocksDB(gorm),
+		Addresses:    NewAddressesDB(gorm),
+		Balances:     NewBalancesDB(gorm),
+		Business:     NewBusinessDB(gorm),
+		Deposits:     NewDepositsDB(gorm),
+		Withdraws:    NewWithdrawsDB(gorm),
+		Internals:    NewInternalsDB(gorm),
+		Transactions: NewTransactionsDB(gorm),
+		Vins:         NewVinsDB(gorm),
+		Vouts:        NewVoutsDB(gorm),
 	}
 	return db, nil
 }
@@ -69,11 +81,17 @@ func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
 func (db *DB) Transaction(fn func(db *DB) error) error {
 	return db.gorm.Transaction(func(tx *gorm.DB) error {
 		txDB := &DB{
-			gorm:      tx,
-			Blocks:    NewBlocksDB(tx),
-			Addresses: NewAddressesDB(tx),
-			Balances:  NewBalancesDB(tx),
-			Business:  NewBusinessDB(tx),
+			gorm:         tx,
+			Blocks:       NewBlocksDB(tx),
+			Addresses:    NewAddressesDB(tx),
+			Balances:     NewBalancesDB(tx),
+			Business:     NewBusinessDB(tx),
+			Deposits:     NewDepositsDB(tx),
+			Withdraws:    NewWithdrawsDB(tx),
+			Internals:    NewInternalsDB(tx),
+			Transactions: NewTransactionsDB(tx),
+			Vins:         NewVinsDB(tx),
+			Vouts:        NewVoutsDB(tx),
 		}
 		return fn(txDB)
 	})

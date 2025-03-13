@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -14,14 +15,9 @@ import (
 )
 
 type Transaction struct {
-	BusinessId     string
-	BlockNumber    *big.Int
-	FromAddress    string
-	ToAddress      string
-	Hash           string
-	TokenAddress   string
-	ContractWallet string
-	TxType         string
+	BusinessId  string
+	BlockNumber *big.Int
+	TxType      string
 }
 
 type Config struct {
@@ -89,6 +85,40 @@ func (syncer *BaseSynchronizer) tick(_ context.Context) {
 	}
 }
 
+// 充值：  from 地址是外部地址；to 地址是系统数据的用户地址
+// 提现：  from 地址热钱包地址；to 地址外部地址
+// 归集：  from 地址是用户钱包地址，to 是热钱包地址
+// 热转冷：from 地址是热钱包地址，to 是冷钱包地址
+// 冷转热  from 地址是冷钱包地址，to 是热钱包地址
 func (syncer *BaseSynchronizer) processBatch(headers []rpcclient.BlockHeader) error {
+	if len(headers) == 0 {
+		log.Info("headers is empty, no block waiting to handle")
+		return nil
+	}
+
+	businessTxChannel := make(map[string]*TransactionsChannel)
+	blockHeaders := make([]database.Blocks, len(headers))
+
+	for i := range headers {
+		log.Info("Sync block data", "height", headers[i].Number)
+		blockHeaders[i] = database.Blocks{
+			Hash:      headers[i].Hash,
+			PrevHash:  headers[i].PrevHash,
+			Number:    headers[i].Number,
+			Timestamp: headers[i].Timestamp,
+		}
+
+		txList, err := syncer.rpcClient.GetBlockByNumber(blockHeaders[i].Number)
+		if err != nil {
+			return err
+		}
+
+		for _, tx := range txList {
+			fmt.Println(tx.GetVin())
+		}
+	}
+	if len(businessTxChannel) > 0 {
+		syncer.businessChannels <- businessTxChannel
+	}
 	return nil
 }

@@ -19,10 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WalletBtcService_GetSupportChains_FullMethodName        = "/WalletBtcService/getSupportChains"
 	WalletBtcService_ConvertAddress_FullMethodName          = "/WalletBtcService/convertAddress"
 	WalletBtcService_ValidAddress_FullMethodName            = "/WalletBtcService/validAddress"
-	WalletBtcService_GetFee_FullMethodName                  = "/WalletBtcService/getFee"
 	WalletBtcService_GetAccount_FullMethodName              = "/WalletBtcService/getAccount"
 	WalletBtcService_GetUnspentOutputs_FullMethodName       = "/WalletBtcService/getUnspentOutputs"
 	WalletBtcService_GetBlockByNumber_FullMethodName        = "/WalletBtcService/getBlockByNumber"
@@ -42,10 +40,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WalletBtcServiceClient interface {
-	GetSupportChains(ctx context.Context, in *SupportChainsRequest, opts ...grpc.CallOption) (*SupportChainsResponse, error)
 	ConvertAddress(ctx context.Context, in *ConvertAddressRequest, opts ...grpc.CallOption) (*ConvertAddressResponse, error)
 	ValidAddress(ctx context.Context, in *ValidAddressRequest, opts ...grpc.CallOption) (*ValidAddressResponse, error)
-	GetFee(ctx context.Context, in *FeeRequest, opts ...grpc.CallOption) (*FeeResponse, error)
 	GetAccount(ctx context.Context, in *AccountRequest, opts ...grpc.CallOption) (*AccountResponse, error)
 	GetUnspentOutputs(ctx context.Context, in *UnspentOutputsRequest, opts ...grpc.CallOption) (*UnspentOutputsResponse, error)
 	GetBlockByNumber(ctx context.Context, in *BlockNumberRequest, opts ...grpc.CallOption) (*BlockResponse, error)
@@ -69,16 +65,6 @@ func NewWalletBtcServiceClient(cc grpc.ClientConnInterface) WalletBtcServiceClie
 	return &walletBtcServiceClient{cc}
 }
 
-func (c *walletBtcServiceClient) GetSupportChains(ctx context.Context, in *SupportChainsRequest, opts ...grpc.CallOption) (*SupportChainsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SupportChainsResponse)
-	err := c.cc.Invoke(ctx, WalletBtcService_GetSupportChains_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *walletBtcServiceClient) ConvertAddress(ctx context.Context, in *ConvertAddressRequest, opts ...grpc.CallOption) (*ConvertAddressResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConvertAddressResponse)
@@ -93,16 +79,6 @@ func (c *walletBtcServiceClient) ValidAddress(ctx context.Context, in *ValidAddr
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ValidAddressResponse)
 	err := c.cc.Invoke(ctx, WalletBtcService_ValidAddress_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *walletBtcServiceClient) GetFee(ctx context.Context, in *FeeRequest, opts ...grpc.CallOption) (*FeeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(FeeResponse)
-	err := c.cc.Invoke(ctx, WalletBtcService_GetFee_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -243,10 +219,8 @@ func (c *walletBtcServiceClient) VerifySignedTransaction(ctx context.Context, in
 // All implementations should embed UnimplementedWalletBtcServiceServer
 // for forward compatibility.
 type WalletBtcServiceServer interface {
-	GetSupportChains(context.Context, *SupportChainsRequest) (*SupportChainsResponse, error)
 	ConvertAddress(context.Context, *ConvertAddressRequest) (*ConvertAddressResponse, error)
 	ValidAddress(context.Context, *ValidAddressRequest) (*ValidAddressResponse, error)
-	GetFee(context.Context, *FeeRequest) (*FeeResponse, error)
 	GetAccount(context.Context, *AccountRequest) (*AccountResponse, error)
 	GetUnspentOutputs(context.Context, *UnspentOutputsRequest) (*UnspentOutputsResponse, error)
 	GetBlockByNumber(context.Context, *BlockNumberRequest) (*BlockResponse, error)
@@ -269,17 +243,11 @@ type WalletBtcServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedWalletBtcServiceServer struct{}
 
-func (UnimplementedWalletBtcServiceServer) GetSupportChains(context.Context, *SupportChainsRequest) (*SupportChainsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetSupportChains not implemented")
-}
 func (UnimplementedWalletBtcServiceServer) ConvertAddress(context.Context, *ConvertAddressRequest) (*ConvertAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConvertAddress not implemented")
 }
 func (UnimplementedWalletBtcServiceServer) ValidAddress(context.Context, *ValidAddressRequest) (*ValidAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ValidAddress not implemented")
-}
-func (UnimplementedWalletBtcServiceServer) GetFee(context.Context, *FeeRequest) (*FeeResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetFee not implemented")
 }
 func (UnimplementedWalletBtcServiceServer) GetAccount(context.Context, *AccountRequest) (*AccountResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAccount not implemented")
@@ -340,24 +308,6 @@ func RegisterWalletBtcServiceServer(s grpc.ServiceRegistrar, srv WalletBtcServic
 	s.RegisterService(&WalletBtcService_ServiceDesc, srv)
 }
 
-func _WalletBtcService_GetSupportChains_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SupportChainsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(WalletBtcServiceServer).GetSupportChains(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: WalletBtcService_GetSupportChains_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WalletBtcServiceServer).GetSupportChains(ctx, req.(*SupportChainsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _WalletBtcService_ConvertAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConvertAddressRequest)
 	if err := dec(in); err != nil {
@@ -390,24 +340,6 @@ func _WalletBtcService_ValidAddress_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(WalletBtcServiceServer).ValidAddress(ctx, req.(*ValidAddressRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _WalletBtcService_GetFee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(FeeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(WalletBtcServiceServer).GetFee(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: WalletBtcService_GetFee_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WalletBtcServiceServer).GetFee(ctx, req.(*FeeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -654,20 +586,12 @@ var WalletBtcService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*WalletBtcServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "getSupportChains",
-			Handler:    _WalletBtcService_GetSupportChains_Handler,
-		},
-		{
 			MethodName: "convertAddress",
 			Handler:    _WalletBtcService_ConvertAddress_Handler,
 		},
 		{
 			MethodName: "validAddress",
 			Handler:    _WalletBtcService_ValidAddress_Handler,
-		},
-		{
-			MethodName: "getFee",
-			Handler:    _WalletBtcService_GetFee_Handler,
 		},
 		{
 			MethodName: "getAccount",
