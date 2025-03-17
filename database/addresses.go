@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 type Addresses struct {
@@ -19,8 +17,8 @@ type Addresses struct {
 }
 
 type AddressesView interface {
-	AddressExist(requestId string, address *common.Address) (bool, uint8)
-	QueryAddressesByToAddress(string, *common.Address) (*Addresses, error)
+	AddressExist(requestId string, address string) (bool, uint8)
+	QueryAddressesByToAddress(string, string) (*Addresses, error)
 	QueryHotWalletInfo(string) (*Addresses, error)
 	QueryColdWalletInfo(string) (*Addresses, error)
 	GetAllAddresses(string) ([]*Addresses, error)
@@ -36,9 +34,9 @@ type addressesDB struct {
 	gorm *gorm.DB
 }
 
-func (db *addressesDB) AddressExist(requestId string, address *common.Address) (bool, uint8) {
+func (db *addressesDB) AddressExist(requestId string, address string) (bool, uint8) {
 	var addressEntry Addresses
-	err := db.gorm.Table("addresses_"+requestId).Where("address", strings.ToLower(address.String())).First(&addressEntry).Error
+	err := db.gorm.Table("addresses_"+requestId).Where("address", strings.ToLower(address)).First(&addressEntry).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, 0
@@ -48,9 +46,9 @@ func (db *addressesDB) AddressExist(requestId string, address *common.Address) (
 	return true, addressEntry.AddressType
 }
 
-func (db *addressesDB) QueryAddressesByToAddress(requestId string, address *common.Address) (*Addresses, error) {
+func (db *addressesDB) QueryAddressesByToAddress(requestId string, address string) (*Addresses, error) {
 	var addressEntry Addresses
-	err := db.gorm.Table("addresses_"+requestId).Where("address", strings.ToLower(address.String())).Take(&addressEntry).Error
+	err := db.gorm.Table("addresses_"+requestId).Where("address", address).Take(&addressEntry).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, gorm.ErrRecordNotFound

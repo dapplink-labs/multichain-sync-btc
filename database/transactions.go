@@ -16,6 +16,7 @@ type Transactions struct {
 	Amount      string   `json:"amount"`
 	Fee         *big.Int `gorm:"serializer:u256"`
 	LockTime    *big.Int `gorm:"serializer:u256"`
+	TxType      string   `json:"tx_type"`
 	Version     string   `json:"version"`
 	Status      uint8    `json:"status"`
 	Timestamp   uint64   `json:"timestamp"`
@@ -38,6 +39,7 @@ func NewTransactionsDB(db *gorm.DB) TransactionsDB {
 	return &tansactionsDB{gorm: db}
 }
 
-func (v tansactionsDB) StoreTransactions(businessId string, tansactions []Transactions) error {
-	panic("implement me")
+func (db *tansactionsDB) StoreTransactions(requestId string, transactionsList []Transactions) error {
+	result := db.gorm.Table("transactions_"+requestId).CreateInBatches(&transactionsList, len(transactionsList))
+	return result.Error
 }

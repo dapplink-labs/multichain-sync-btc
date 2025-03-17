@@ -1,24 +1,26 @@
 package database
 
 import (
+	"fmt"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"math/big"
 )
 
 type Withdraws struct {
-	Guid        string   `gorm:"primaryKey" json:"guid"`
-	BlockHash   string   `json:"block_hash"`
-	BlockNumber *big.Int `gorm:"serializer:u256;check:block_number > 0" json:"block_number"`
-	Hash        string   `json:"hash"`
-	FromAddress string   `json:"from_address"`
-	ToAddress   string   `json:"to_address"`
-	Amount      string   `json:"amount"`
-	Fee         *big.Int `gorm:"serializer:u256" json:"fee"`
-	LockTime    *big.Int `gorm:"serializer:u256" json:"lock_time"`
-	Version     string   `json:"version"`
-	TxSignHex   string   `json:"tx_sign_hex"`
-	Status      uint8    `gorm:"default:0" json:"status"`
-	Timestamp   uint64   `json:"timestamp"`
+	Guid        uuid.UUID `gorm:"primaryKey" json:"guid"`
+	BlockHash   string    `json:"block_hash"`
+	BlockNumber *big.Int  `gorm:"serializer:u256;check:block_number > 0" json:"block_number"`
+	Hash        string    `json:"hash"`
+	FromAddress string    `json:"from_address"`
+	ToAddress   string    `json:"to_address"`
+	Amount      string    `json:"amount"`
+	Fee         *big.Int  `gorm:"serializer:u256" json:"fee"`
+	LockTime    *big.Int  `gorm:"serializer:u256" json:"lock_time"`
+	Version     string    `json:"version"`
+	TxSignHex   string    `json:"tx_sign_hex"`
+	Status      uint8     `gorm:"default:0" json:"status"`
+	Timestamp   uint64    `json:"timestamp"`
 }
 
 type WithdrawsView interface {
@@ -27,7 +29,8 @@ type WithdrawsView interface {
 type WithdrawsDB interface {
 	WithdrawsView
 
-	StoreWithdraws(string, []Withdraws) error
+	StoreWithdraws(string, *Withdraws) error
+	UpdateWithdrawStatus(requestId string, status TxStatus, withdrawsList []Withdraws) error
 }
 
 type withdrawsDB struct {
@@ -38,6 +41,45 @@ func NewWithdrawsDB(db *gorm.DB) WithdrawsDB {
 	return &withdrawsDB{gorm: db}
 }
 
-func (w withdrawsDB) StoreWithdraws(businessId string, withdraws []Withdraws) error {
-	panic("implement me")
+func (db *withdrawsDB) StoreWithdraws(requestId string, withdrawsList *Withdraws) error {
+	result := db.gorm.Table("withdraws_" + requestId).Create(&withdrawsList)
+	return result.Error
+}
+
+func (db *withdrawsDB) UpdateWithdrawStatus(requestId string, status TxStatus, withdrawsList []Withdraws) error {
+	if len(withdrawsList) == 0 {
+		return nil
+	}
+	tableName := fmt.Sprintf("withdraws_%s", requestId)
+
+	return db.gorm.Transaction(func(tx *gorm.DB) error {
+		var guids []uuid.UUID
+		for _, withdraw := range withdrawsList {
+			guids = append(guids, withdraw.GUID)
+		}
+
+		result := tx.Table(tableName).
+			Where("guid IN ?", guids).
+			Where("status = ?", TxStatusWalletDone).
+			Update("status", status)
+
+		if result.Error != nil {
+			return fmt.Errorf("batch update status failed: %w", result.Error)
+		}
+
+		if result.RowsAffected == 0 {
+			log.Warn("No withdraws updated",
+				"requestId", requestId,
+				"expectedCount", len(withdrawsList),
+			)
+		}
+
+		log.Info("Batch update withdraws status success",
+			"requestId", requestId,
+			"count", result.RowsAffected,
+			"status", status,
+		)
+
+		return nil
+	})
 }

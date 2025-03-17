@@ -32,7 +32,7 @@ func NewVoutsDB(db *gorm.DB) VoutsDB {
 	return &voutsDB{gorm: db}
 }
 
-func (v voutsDB) StoreVouts(businessId string, vouts []Vouts) error {
-	//TODO implement me
-	panic("implement me")
+func (vout voutsDB) StoreVouts(businessId string, vouts []Vouts) error {
+	result := vout.gorm.Table("vouts"+businessId).CreateInBatches(&vouts, len(vouts))
+	return result.Error
 }

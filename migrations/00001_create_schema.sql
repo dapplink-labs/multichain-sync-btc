@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS deposits
     fee           UINT256  NOT NULL,
     lock_time     UINT256  NOT NULL,
     version       VARCHAR  NOT NULL,
-    amount        UINT256  NOT NULL,
+    amount        VARCHAR  NOT NULL,
     confirms      SMALLINT NOT NULL DEFAULT 0,
     status        SMALLINT NOT NULL DEFAULT 0,
     timestamp     INTEGER  NOT NULL CHECK (timestamp > 0)
