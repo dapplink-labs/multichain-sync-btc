@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dapplink-labs/multichain-sync-btc/common/retry"
 	"github.com/google/uuid"
 	"math/big"
 	"strings"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/dapplink-labs/multichain-sync-btc/common/retry"
 	"github.com/dapplink-labs/multichain-sync-btc/common/tasks"
 	"github.com/dapplink-labs/multichain-sync-btc/config"
 	"github.com/dapplink-labs/multichain-sync-btc/database"
@@ -134,6 +134,7 @@ func (deposit *Deposit) handleBatch(batch map[string]*TransactionsChannel) error
 		log.Info("handle business flow", "businessId", business.BusinessUid, "chainLatestBlock", batch[business.BusinessUid].BlockHeight, "txn", len(batch[business.BusinessUid].Transactions))
 		var pvList []*PrepareVoutList
 		for _, tx := range batch[business.BusinessUid].Transactions {
+
 			txItem, err := deposit.rpcClient.GetTransactionByHash(tx.Hash)
 			if err != nil {
 				log.Info("get transaction by hash fail", "err", err)
@@ -148,16 +149,19 @@ func (deposit *Deposit) handleBatch(batch map[string]*TransactionsChannel) error
 			}
 			transactionFlowList = append(transactionFlowList, transactionFlow)
 
-			vintListPre, err := deposit.HandleVin(tx)
+			vintListPre, vinBalances, err := deposit.HandleVin(tx)
 			if err != nil {
 				log.Error("handle vout fail", "err", err)
 			}
 			vins = append(vins, vintListPre...)
+			balances = append(balances, vinBalances...)
 
-			voutListPre, err := deposit.HandleVout(tx)
+			voutListPre, voutBalances, err := deposit.HandleVout(tx, business.BusinessUid)
 			if err != nil {
 				log.Error("handle vout fail", "err", err)
 			}
+			balances = append(balances, voutBalances...)
+
 			pvList = append(pvList, voutListPre)
 			vlist := voutListPre.VoutList
 			vouts = append(vouts, vlist...)
@@ -298,7 +302,7 @@ func (deposit *Deposit) HandleWithdraw(tx *Transaction) (database.Withdraws, err
 		ToAddress:   addressToString,
 		Amount:      amountString,
 		Fee:         txFee,
-		Status:      2,
+		Status:      uint8(database.TxStatusWalletDone),
 		Timestamp:   uint64(time.Now().Unix()),
 	}
 	return withdrawTx, nil
@@ -408,8 +412,9 @@ func (deposit *Deposit) HandleInternalTx(tx *Transaction) (database.Internals, e
 	return internalTx, nil
 }
 
-func (deposit *Deposit) HandleVin(tx *Transaction) ([]database.Vins, error) {
+func (deposit *Deposit) HandleVin(tx *Transaction) ([]database.Vins, []database.TokenBalance, error) {
 	var vinList []database.Vins
+	var balanceList []database.TokenBalance
 	for _, vout := range tx.VoutList {
 		vinTx := database.Vins{
 			GUID:             uuid.New(),
@@ -424,13 +429,24 @@ func (deposit *Deposit) HandleVin(tx *Transaction) ([]database.Vins, error) {
 			IsSpend:          false,
 			Timestamp:        uint64(time.Now().Unix()),
 		}
+		if tx.TxType == "deposit" || tx.TxType == "collection" || tx.TxType == "hot2cold" || tx.TxType == "cold2hot" {
+			balanceItem := database.TokenBalance{
+				FromAddress:  "",
+				ToAddress:    vout.Address,
+				TokenAddress: "",
+				Balance:      vout.Amount,
+				TxType:       tx.TxType,
+			}
+			balanceList = append(balanceList, balanceItem)
+		}
 		vinList = append(vinList, vinTx)
 	}
-	return vinList, nil
+	return vinList, balanceList, nil
 }
 
-func (deposit *Deposit) HandleVout(tx *Transaction) (*PrepareVoutList, error) {
+func (deposit *Deposit) HandleVout(tx *Transaction, businessID string) (*PrepareVoutList, []database.TokenBalance, error) {
 	var voutList []database.Vouts
+	var balanceList []database.TokenBalance
 	for _, vin := range tx.VinList {
 		vout := database.Vouts{
 			GUID:      uuid.New(),
@@ -440,12 +456,30 @@ func (deposit *Deposit) HandleVout(tx *Transaction) (*PrepareVoutList, error) {
 			Timestamp: uint64(time.Now().Unix()),
 		}
 		voutList = append(voutList, vout)
+		if tx.TxType == "withdraw" || tx.TxType == "collection" || tx.TxType == "hot2cold" || tx.TxType == "cold2hot" {
+			vinAddressess := strings.Split(vin.Address, "|")
+			for _, addr := range vinAddressess {
+				vinDetail, err := deposit.database.Vins.QueryVinByTxId(businessID, addr, tx.Hash)
+				if err != nil {
+					log.Error("query vins fail", "err", err)
+				}
+				balanceItem := database.TokenBalance{
+					FromAddress:  addr,
+					ToAddress:    "",
+					TokenAddress: "",
+					Balance:      vinDetail.Amount,
+					TxType:       tx.TxType,
+				}
+				balanceList = append(balanceList, balanceItem)
+			}
+		}
+
 	}
 	return &PrepareVoutList{
 		TxId:        tx.Hash,
 		BlockNumber: tx.BlockNumber,
 		VoutList:    voutList,
-	}, nil
+	}, balanceList, nil
 }
 
 type PrepareVoutList struct {

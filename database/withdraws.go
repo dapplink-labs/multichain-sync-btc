@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"math/big"
@@ -24,6 +25,7 @@ type Withdraws struct {
 }
 
 type WithdrawsView interface {
+	UnSendWithdrawsList(requestId string) ([]Withdraws, error)
 }
 
 type WithdrawsDB interface {
@@ -55,7 +57,7 @@ func (db *withdrawsDB) UpdateWithdrawStatus(requestId string, status TxStatus, w
 	return db.gorm.Transaction(func(tx *gorm.DB) error {
 		var guids []uuid.UUID
 		for _, withdraw := range withdrawsList {
-			guids = append(guids, withdraw.GUID)
+			guids = append(guids, withdraw.Guid)
 		}
 
 		result := tx.Table(tableName).
@@ -82,4 +84,17 @@ func (db *withdrawsDB) UpdateWithdrawStatus(requestId string, status TxStatus, w
 
 		return nil
 	})
+}
+
+func (db *withdrawsDB) UnSendWithdrawsList(requestId string) ([]Withdraws, error) {
+	var withdrawsList []Withdraws
+	err := db.gorm.Table("withdraws_"+requestId).
+		Where("status = ?", TxStatusSigned).
+		Find(&withdrawsList).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("query unsend withdraws failed: %w", err)
+	}
+
+	return withdrawsList, nil
 }

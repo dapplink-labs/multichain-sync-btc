@@ -2,6 +2,7 @@ package database
 
 type TxStatus uint8
 
+// 提现是没有确认位的
 const (
 	TxStatusUnsigned    TxStatus = 0 // 交易未签名
 	TxStatusSigned      TxStatus = 1 // 交易交易已签名

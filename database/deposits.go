@@ -65,7 +65,7 @@ func (db *depositsDB) UpdateDepositsComfirms(requestId string, blockNumber uint6
 		chainConfirm := blockNumber - deposit.BlockNumber.Uint64()
 		if chainConfirm >= confirms {
 			deposit.Confirms = uint8(confirms)
-			deposit.Status = 1
+			deposit.Status = 1 // 已经过了确认位
 		} else {
 			deposit.Confirms = uint8(chainConfirm)
 		}

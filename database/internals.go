@@ -26,6 +26,7 @@ type Internals struct {
 }
 
 type InternalsView interface {
+	UnSendInternalsList(requestId string) ([]Internals, error)
 }
 
 type InternalsDB interface {
@@ -108,4 +109,15 @@ func (db *internalsDB) UpdateInternalStatus(requestId string, status TxStatus, i
 
 		return nil
 	})
+}
+
+func (db *internalsDB) UnSendInternalsList(requestId string) ([]Internals, error) {
+	var internalsList []Internals
+	err := db.gorm.Table("internals_"+requestId).
+		Where("status = ?", TxStatusSigned).
+		Find(&internalsList).Error
+	if err != nil {
+		return nil, err
+	}
+	return internalsList, nil
 }
