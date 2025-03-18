@@ -131,9 +131,8 @@ func validateRequest(request *dal_wallet_go.UnSignWithdrawTransactionRequest) er
 }
 
 func (bws *BusinessMiddleWireServices) storeWithdraw(request *dal_wallet_go.UnSignWithdrawTransactionRequest, amountBig *big.Int, fee *big.Int) error {
-	var withdraws []database.Withdraws
-	withdraw := database.Withdraws{
-		Guid:        request.Txn[0].TransactionUuid,
+	withdraw := &database.Withdraws{
+		Guid:        uuid.New(),
 		Timestamp:   uint64(time.Now().Unix()),
 		Status:      uint8(database.TxStatusUnsigned),
 		BlockHash:   "",
@@ -145,14 +144,12 @@ func (bws *BusinessMiddleWireServices) storeWithdraw(request *dal_wallet_go.UnSi
 		Fee:         amountBig,
 		TxSignHex:   "",
 	}
-	withdraws = append(withdraws, withdraw)
-	return bws.db.Withdraws.StoreWithdraws(request.RequestId, withdraws)
+	return bws.db.Withdraws.StoreWithdraws(request.RequestId, withdraw)
 }
 
 func (bws *BusinessMiddleWireServices) storeInternal(request *dal_wallet_go.UnSignWithdrawTransactionRequest, amountBig *big.Int, fee *big.Int) error {
-	var internals []database.Internals
-	internal := database.Internals{
-		Guid:        request.Txn[0].TransactionUuid,
+	internal := &database.Internals{
+		Guid:        uuid.New(),
 		Timestamp:   uint64(time.Now().Unix()),
 		Status:      uint8(database.TxStatusUnsigned),
 		BlockHash:   "",
@@ -164,6 +161,5 @@ func (bws *BusinessMiddleWireServices) storeInternal(request *dal_wallet_go.UnSi
 		Fee:         fee,
 		TxSignHex:   "",
 	}
-	internals = append(internals, internal)
-	return bws.db.Internals.StoreInternals(request.RequestId, internals)
+	return bws.db.Internals.StoreInternal(request.RequestId, internal)
 }
