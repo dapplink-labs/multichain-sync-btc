@@ -26,6 +26,7 @@ type Internals struct {
 }
 
 type InternalsView interface {
+	QueryNotifyInternal(requestId string) ([]Internals, error)
 	UnSendInternalsList(requestId string) ([]Internals, error)
 }
 
@@ -43,6 +44,17 @@ type internalsDB struct {
 
 func NewInternalsDB(db *gorm.DB) InternalsDB {
 	return &internalsDB{gorm: db}
+}
+
+func (db *internalsDB) QueryNotifyInternal(requestId string) ([]Internals, error) {
+	var notifyInternals []Internals
+	result := db.gorm.Table("internals_"+requestId).
+		Where("status = ?", TxStatusWalletDone).
+		Find(&notifyInternals)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return notifyInternals, nil
 }
 
 func (db *internalsDB) StoreInternal(requestId string, internals *Internals) error {

@@ -25,6 +25,8 @@ type Withdraws struct {
 }
 
 type WithdrawsView interface {
+	QueryNotifyWithdraws(requestId string) ([]Withdraws, error)
+
 	UnSendWithdrawsList(requestId string) ([]Withdraws, error)
 }
 
@@ -84,6 +86,19 @@ func (db *withdrawsDB) UpdateWithdrawStatus(requestId string, status TxStatus, w
 
 		return nil
 	})
+}
+
+func (db *withdrawsDB) QueryNotifyWithdraws(requestId string) ([]Withdraws, error) {
+	var notifyWithdraws []Withdraws
+	result := db.gorm.Table("withdraws_"+requestId).
+		Where("status = ?", TxStatusWalletDone).
+		Find(&notifyWithdraws)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("query notify withdraws failed: %w", result.Error)
+	}
+
+	return notifyWithdraws, nil
 }
 
 func (db *withdrawsDB) UnSendWithdrawsList(requestId string) ([]Withdraws, error) {
