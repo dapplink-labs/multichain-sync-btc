@@ -180,6 +180,32 @@ var (
 		EnvVars: prefixEnvVars("SLAVE_DB_NAME"),
 	}
 
+	RedisHostFlag = &cli.StringFlag{
+		Name:    "redis-name",
+		Usage:   "The host of the redis",
+		EnvVars: prefixEnvVars("REDIS_HOST"),
+	}
+	RedisPortFlag = &cli.StringFlag{
+		Name:    "redis-port",
+		Usage:   "The port of the redis",
+		EnvVars: prefixEnvVars("REDIS_PORT"),
+	}
+	RedisDBFlag = &cli.StringFlag{
+		Name:    "redis-DB",
+		Usage:   "The db of the redis",
+		EnvVars: prefixEnvVars("REDIS_DB"),
+	}
+	RedisPasswordFlag = &cli.StringFlag{
+		Name:    "redis-password",
+		Usage:   "The password of the redis",
+		EnvVars: prefixEnvVars("REDIS_PASSWORD"),
+	}
+	RedisFilterFlag = &cli.StringFlag{
+		Name:    "redis-filter-name",
+		Usage:   "The filterName of the redis",
+		EnvVars: prefixEnvVars("REDIS_FILTER_NAME"),
+	}
+
 	// cache flags
 	ApiCacheListSizeFlag = &cli.UintFlag{
 		Name:    "api-cache-list-size",
@@ -226,6 +252,11 @@ var requireFlags = []cli.Flag{
 	MasterDbUserFlag,
 	MasterDbPasswordFlag,
 	MasterDbNameFlag,
+	RedisHostFlag,
+	RedisPortFlag,
+	RedisDBFlag,
+	RedisPasswordFlag,
+	RedisFilterFlag,
 }
 
 var optionalFlags = []cli.Flag{

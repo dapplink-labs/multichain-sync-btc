@@ -2,6 +2,7 @@ package multichain_transaction_syncs
 
 import (
 	"context"
+	"github.com/dapplink-labs/multichain-sync-btc/bloomfilter"
 	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/btc"
 	"sync/atomic"
 
@@ -21,15 +22,21 @@ type MultiChainSync struct {
 	Deposit      *worker.Deposit
 	Withdraw     *worker.Withdraw
 	Internal     *worker.Internal
-
-	shutdown context.CancelCauseFunc
-	stopped  atomic.Bool
+	BloomFilter  *bloomfilter.BloomFilter
+	shutdown     context.CancelCauseFunc
+	stopped      atomic.Bool
 }
 
 func NewMultiChainSync(ctx context.Context, cfg *config.Config, shutdown context.CancelCauseFunc) (*MultiChainSync, error) {
 	db, err := database.NewDB(ctx, cfg.MasterDB)
 	if err != nil {
 		log.Error("init database fail", err)
+		return nil, err
+	}
+
+	filter, err := bloomfilter.InitBloomFilter(ctx, &cfg.BloomFilter, db)
+	if err != nil {
+		log.Error("init bloom filter fail", err)
 		return nil, err
 	}
 
@@ -51,10 +58,11 @@ func NewMultiChainSync(ctx context.Context, cfg *config.Config, shutdown context
 	internal, _ := worker.NewInternal(cfg, db, accountClient, shutdown)
 
 	out := &MultiChainSync{
-		Deposit:  deposit,
-		Withdraw: withdraw,
-		Internal: internal,
-		shutdown: shutdown,
+		Deposit:     deposit,
+		Withdraw:    withdraw,
+		Internal:    internal,
+		BloomFilter: filter,
+		shutdown:    shutdown,
 	}
 	return out, nil
 }

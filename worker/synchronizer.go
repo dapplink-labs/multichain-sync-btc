@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"github.com/dapplink-labs/multichain-sync-btc/bloomfilter"
 	"math/big"
 	"strings"
 	"time"
@@ -52,9 +53,10 @@ type BaseSynchronizer struct {
 
 	businessChannels chan map[string]*TransactionsChannel
 
-	rpcClient  *rpcclient.WalletBtcAccountClient
-	blockBatch *rpcclient.BatchBlock
-	database   *database.DB
+	rpcClient   *rpcclient.WalletBtcAccountClient
+	blockBatch  *rpcclient.BatchBlock
+	database    *database.DB
+	bloomFilter *bloomfilter.BloomFilter
 
 	headers []rpcclient.BlockHeader
 	worker  *clock.LoopFn
@@ -164,9 +166,11 @@ func (syncer *BaseSynchronizer) processBatch(headers []rpcclient.BlockHeader) er
 				txItem.VoutList = voutArray
 				var existToAddress bool
 				var toAddressType uint8
-
 				isDeposit, isWithdraw, isCollection, isToCold, isToHot := false, false, false, false, false
 				for index := range toAddressList {
+					//todo -1:不存在; 0:用户; 1:热钱包; 2:冷钱包
+					exists, err := syncer.bloomFilter.Exists(context.Background(), businessId.BusinessUid, toAddressList[index])
+					log.Info("address type", exists)
 					existToAddress, toAddressType = syncer.database.Addresses.AddressExist(businessId.BusinessUid, toAddressList[index])
 					hotWalletAddress, errHot := syncer.database.Addresses.QueryHotWalletInfo(businessId.BusinessUid)
 					if errHot != nil {
