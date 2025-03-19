@@ -28,6 +28,7 @@ type Config struct {
 	RpcServer      ServerConfig
 	MetricsServer  ServerConfig
 	ChainBtcRpc    string
+	BloomFilter    RedisConfig
 }
 
 type ChainNodeConfig struct {
@@ -47,6 +48,14 @@ type DBConfig struct {
 	Name     string
 	User     string
 	Password string
+}
+
+type RedisConfig struct {
+	Host       string
+	Port       int
+	Password   string
+	DB         int
+	FilterName string
 }
 
 type CacheConfig struct {
@@ -128,6 +137,13 @@ func NewConfig(ctx *cli.Context) Config {
 		MetricsServer: ServerConfig{
 			Host: ctx.String(flags.MetricsHostFlag.Name),
 			Port: ctx.Int(flags.MetricsPortFlag.Name),
+		},
+		BloomFilter: RedisConfig{
+			Host:       ctx.String(flags.RedisHostFlag.Name),
+			Port:       ctx.Int(flags.RedisPortFlag.Name),
+			Password:   ctx.String(flags.RedisPasswordFlag.Name),
+			DB:         ctx.Int(flags.RedisDBFlag.Name),
+			FilterName: ctx.String(flags.RedisFilterFlag.Name),
 		},
 	}
 }
