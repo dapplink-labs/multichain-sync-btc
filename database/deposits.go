@@ -25,6 +25,7 @@ type Deposits struct {
 }
 
 type DepositsView interface {
+	QueryNotifyDeposits(string) ([]Deposits, error)
 }
 
 type DepositsDB interface {
@@ -32,6 +33,7 @@ type DepositsDB interface {
 
 	StoreDeposits(string, []Deposits) error
 	UpdateDepositsComfirms(requestId string, blockNumber uint64, confirms uint64) error
+	UpdateDepositsNotifyStatus(requestId string, status uint8, depositList []Deposits) error
 }
 
 type depositsDB struct {
@@ -49,6 +51,18 @@ func (db *depositsDB) StoreDeposits(requestId string, depositList []Deposits) er
 		return result.Error
 	}
 	return nil
+}
+
+func (db *depositsDB) QueryNotifyDeposits(requestId string) ([]Deposits, error) {
+	var notifyDeposits []Deposits
+	result := db.gorm.Table("deposits_"+requestId).Where("status = ? or status = ?", 0, 1).Find(notifyDeposits)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return nil, result.Error
+	}
+	return notifyDeposits, nil
 }
 
 // UpdateDepositsComfirms 查询所有还没有过确认位交易，用最新区块减去对应区块更新确认，如果这个大于我们预设的确认位，那么这笔交易可以认为已经入账
@@ -70,6 +84,25 @@ func (db *depositsDB) UpdateDepositsComfirms(requestId string, blockNumber uint6
 			deposit.Confirms = uint8(chainConfirm)
 		}
 		err := db.gorm.Table("deposits_" + requestId).Save(&deposit).Error
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *depositsDB) UpdateDepositsNotifyStatus(requestId string, status uint8, depositList []Deposits) error {
+	for i := 0; i < len(depositList); i++ {
+		var depositSingle = Deposits{}
+		result := db.gorm.Table("deposits_" + requestId).Where(&Transactions{Hash: depositList[i].Hash}).Take(&depositSingle)
+		if result.Error != nil {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return result.Error
+		}
+		depositSingle.Status = status
+		err := db.gorm.Table("transactions_" + requestId).Save(&depositSingle).Error
 		if err != nil {
 			return err
 		}
