@@ -57,7 +57,7 @@ func InitBloomFilter(ctx context.Context, config *config.RedisConfig, db *databa
 func (bf *BloomFilter) Add(ctx context.Context, requestId string, item string, addressType int) error {
 	e, _ := bf.rdb.Exists(ctx, requestId).Result()
 	if e != 1 {
-		i, _ := bf.rdb.Do(ctx, "BF.RESERVE", requestId, "0.01").Result()
+		i, _ := bf.rdb.Do(ctx, "BF.RESERVE", requestId, 0.01, 100).Result()
 		if i != 1 {
 			log.Error("create bloom filter failed")
 		}
@@ -73,16 +73,16 @@ func (bf *BloomFilter) Exists(ctx context.Context, requestId string, key string)
 		return -1, nil
 	}
 	userKey := fmt.Sprintf(key, "0")
-	coldKey := fmt.Sprintf(key, "1")
-	hotKey := fmt.Sprintf(key, "2")
 	result, _ := bf.rdb.Do(ctx, "BF.EXISTS", requestId, userKey).Int()
 	if result == 1 {
 		return 0, nil
 	}
+	hotKey := fmt.Sprintf(key, "1")
 	result, _ = bf.rdb.Do(ctx, "BF.EXISTS", requestId, hotKey).Int()
 	if result == 1 {
 		return 1, nil
 	}
+	coldKey := fmt.Sprintf(key, "2")
 	result, _ = bf.rdb.Do(ctx, "BF.EXISTS", requestId, coldKey).Int()
 	if result == 1 {
 		return 2, nil
