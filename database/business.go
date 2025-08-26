@@ -13,6 +13,7 @@ type Business struct {
 	GUID        uuid.UUID `gorm:"primaryKey" json:"guid"`
 	BusinessUid string    `json:"business_uid"`
 	NotifyUrl   string    `json:"notify_url"`
+	CallBackUrl string    `json:"call_back_url"`
 	Timestamp   uint64
 }
 

@@ -2,7 +2,6 @@ package multichain_transaction_syncs
 
 import (
 	"context"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/btc"
 	"sync/atomic"
 
 	"google.golang.org/grpc"
@@ -12,7 +11,8 @@ import (
 
 	"github.com/dapplink-labs/multichain-sync-btc/config"
 	"github.com/dapplink-labs/multichain-sync-btc/database"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient/utxo"
 	"github.com/dapplink-labs/multichain-sync-btc/worker"
 )
 
@@ -39,8 +39,8 @@ func NewMultiChainSync(ctx context.Context, cfg *config.Config, shutdown context
 		log.Error("Connect to da retriever fail", "err", err)
 		return nil, err
 	}
-	client := btc.NewWalletBtcServiceClient(conn)
-	accountClient, err := rpcclient.NewWalletBtcAccountClient(context.Background(), client, "Ethereum")
+	client := utxo.NewWalletUtxoServiceClient(conn)
+	accountClient, err := syncclient.NewWalletBtcAccountClient(context.Background(), client, "Ethereum")
 	if err != nil {
 		log.Error("new wallet account client fail", "err", err)
 		return nil, err

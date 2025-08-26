@@ -11,9 +11,6 @@ type Transactions struct {
 	BlockHash   string
 	BlockNumber *big.Int `gorm:"serializer:u256"`
 	Hash        string   `json:"hash"`
-	FromAddress string   `json:"from_address"`
-	ToAddress   string   `json:"to_address"`
-	Amount      string   `json:"amount"`
 	Fee         *big.Int `gorm:"serializer:u256"`
 	LockTime    *big.Int `gorm:"serializer:u256"`
 	TxType      string   `json:"tx_type"`

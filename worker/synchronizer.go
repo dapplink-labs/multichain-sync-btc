@@ -11,8 +11,7 @@ import (
 
 	"github.com/dapplink-labs/multichain-sync-btc/common/clock"
 	"github.com/dapplink-labs/multichain-sync-btc/database"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/btc"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient"
 )
 
 type Vin struct {
@@ -25,8 +24,8 @@ type Vin struct {
 type Vout struct {
 	Address string
 	N       uint8
-	Script  *btc.ScriptPubKey
-	Amount  *big.Int
+	//Script  *utxo.ScriptPubKey
+	Amount *big.Int
 }
 
 type Transaction struct {
@@ -52,11 +51,11 @@ type BaseSynchronizer struct {
 
 	businessChannels chan map[string]*TransactionsChannel
 
-	rpcClient  *rpcclient.WalletBtcAccountClient
-	blockBatch *rpcclient.BatchBlock
+	rpcClient  *syncclient.WalletBtcAccountClient
+	blockBatch *syncclient.BatchBlock
 	database   *database.DB
 
-	headers []rpcclient.BlockHeader
+	headers []syncclient.BlockHeader
 	worker  *clock.LoopFn
 }
 
@@ -109,7 +108,7 @@ func (syncer *BaseSynchronizer) tick(_ context.Context) {
 // 归集：  from 地址是用户钱包地址，to 是热钱包地址
 // 热转冷：from 地址是热钱包地址，to 是冷钱包地址
 // 冷转热  from 地址是冷钱包地址，to 是热钱包地址
-func (syncer *BaseSynchronizer) processBatch(headers []rpcclient.BlockHeader) error {
+func (syncer *BaseSynchronizer) processBatch(headers []syncclient.BlockHeader) error {
 	if len(headers) == 0 {
 		log.Info("headers is empty, no block waiting to handle")
 		return nil
@@ -156,7 +155,6 @@ func (syncer *BaseSynchronizer) processBatch(headers []rpcclient.BlockHeader) er
 					voutItem := Vout{
 						Address: vout.Address,
 						N:       uint8(vout.Index),
-						Script:  vout.ScriptPubKey,
 						Amount:  big.NewInt(int64(vout.Amount)),
 					}
 					voutArray = append(voutArray, voutItem)
@@ -181,8 +179,8 @@ func (syncer *BaseSynchronizer) processBatch(headers []rpcclient.BlockHeader) er
 						vinItem := Vin{
 							Address: txVin.Address,
 							TxId:    tx.Hash,
-							Vout:    uint8(txVin.Vout),
-							Amount:  big.NewInt(int64(txVin.Amount)),
+							// Vout:    uint8(txVin.Vout),
+							Amount: big.NewInt(int64(txVin.Amount)),
 						}
 						vinArray = append(vinArray, vinItem)
 						addressList := strings.Split(txVin.Address, "|")

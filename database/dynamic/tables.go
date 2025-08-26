@@ -15,6 +15,7 @@ func CreateTableFromTemplate(requestId string, db *database.DB) {
 	createTransactions(requestId, db)
 	createWithdraws(requestId, db)
 	createInternals(requestId, db)
+	createChildTxn(requestId, db)
 }
 
 func createAddresses(requestId string, db *database.DB) {
@@ -62,5 +63,11 @@ func createWithdraws(requestId string, db *database.DB) {
 func createInternals(requestId string, db *database.DB) {
 	tableName := "internals"
 	tableNameByChainId := fmt.Sprintf("internals_%s", requestId)
+	db.CreateTable.CreateTable(tableNameByChainId, tableName)
+}
+
+func createChildTxn(requestId string, db *database.DB) {
+	tableName := "child_txs"
+	tableNameByChainId := fmt.Sprintf("child_txs_%s", requestId)
 	db.CreateTable.CreateTable(tableNameByChainId, tableName)
 }

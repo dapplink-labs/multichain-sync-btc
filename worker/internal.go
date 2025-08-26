@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dapplink-labs/multichain-sync-btc/common/retry"
-	"math/big"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -14,11 +12,11 @@ import (
 	"github.com/dapplink-labs/multichain-sync-btc/common/tasks"
 	"github.com/dapplink-labs/multichain-sync-btc/config"
 	"github.com/dapplink-labs/multichain-sync-btc/database"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient"
 )
 
 type Internal struct {
-	rpcClient      *rpcclient.WalletBtcAccountClient
+	rpcClient      *syncclient.WalletBtcAccountClient
 	db             *database.DB
 	resourceCtx    context.Context
 	resourceCancel context.CancelFunc
@@ -26,7 +24,7 @@ type Internal struct {
 	ticker         *time.Ticker
 }
 
-func NewInternal(cfg *config.Config, db *database.DB, rpcClient *rpcclient.WalletBtcAccountClient, shutdown context.CancelCauseFunc) (*Internal, error) {
+func NewInternal(cfg *config.Config, db *database.DB, rpcClient *syncclient.WalletBtcAccountClient, shutdown context.CancelCauseFunc) (*Internal, error) {
 	resCtx, resCancel := context.WithCancel(context.Background())
 	return &Internal{
 		rpcClient:      rpcClient,
@@ -74,16 +72,16 @@ func (w *Internal) Start() error {
 					}
 					var balanceList []database.Balances
 					for _, unSendInternalTx := range unSendInternalTxList {
-						bAddressList := strings.Split(unSendInternalTx.FromAddress, "|")
-						bAmountList := strings.Split(unSendInternalTx.Amount, "|")
-						for index, _ := range bAddressList {
-							lockBalance, _ := new(big.Int).SetString(bAmountList[index], 10)
-							balanceItem := database.Balances{
-								Address:     bAddressList[index],
-								LockBalance: lockBalance,
-							}
-							balanceList = append(balanceList, balanceItem)
-						}
+						//bAddressList := strings.Split(unSendInternalTx.FromAddress, "|")
+						//bAmountList := strings.Split(unSendInternalTx.Amount, "|")
+						//for index, _ := range bAddressList {
+						//	lockBalance, _ := new(big.Int).SetString(bAmountList[index], 10)
+						//	balanceItem := database.Balances{
+						//		Address:     bAddressList[index],
+						//		LockBalance: lockBalance,
+						//	}
+						//	balanceList = append(balanceList, balanceItem)
+						//}
 						txHash, err := w.rpcClient.SendTx(unSendInternalTx.TxSignHex)
 						if err != nil {
 							log.Error("send transaction fail", "err", err)

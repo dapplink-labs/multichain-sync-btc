@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient"
 )
 
 type Blocks struct {
@@ -17,12 +17,12 @@ type Blocks struct {
 	Timestamp uint64
 }
 
-func BlockHeaderFromHeader(header *types.Header) rpcclient.BlockHeader {
-	return rpcclient.BlockHeader{}
+func BlockHeaderFromHeader(header *types.Header) syncclient.BlockHeader {
+	return syncclient.BlockHeader{}
 }
 
 type BlocksView interface {
-	LatestBlocks() (*rpcclient.BlockHeader, error)
+	LatestBlocks() (*syncclient.BlockHeader, error)
 }
 
 type BlocksDB interface {
@@ -44,7 +44,7 @@ func (db *blocksDB) StoreBlockss(headers []Blocks) error {
 	return result.Error
 }
 
-func (db *blocksDB) LatestBlocks() (*rpcclient.BlockHeader, error) {
+func (db *blocksDB) LatestBlocks() (*syncclient.BlockHeader, error) {
 	var header Blocks
 	result := db.gorm.Order("number DESC").Take(&header)
 	if result.Error != nil {
@@ -53,5 +53,5 @@ func (db *blocksDB) LatestBlocks() (*rpcclient.BlockHeader, error) {
 		}
 		return nil, result.Error
 	}
-	return (*rpcclient.BlockHeader)(&header), nil
+	return (*syncclient.BlockHeader)(&header), nil
 }

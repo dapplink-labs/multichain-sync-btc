@@ -2,10 +2,11 @@ package database
 
 import (
 	"errors"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/google/uuid"
 )
 
 type Deposits struct {
@@ -13,9 +14,6 @@ type Deposits struct {
 	BlockHash   string
 	BlockNumber *big.Int `gorm:"serializer:u256"`
 	Hash        string   `json:"hash"`
-	FromAddress string   `json:"from_address"`
-	ToAddress   string   `json:"to_address"`
-	Amount      string   `json:"amount"`
 	Fee         *big.Int `gorm:"serializer:u256"`
 	LockTime    *big.Int `gorm:"serializer:u256"`
 	Version     string   `json:"version"`

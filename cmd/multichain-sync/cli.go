@@ -20,8 +20,8 @@ import (
 	"github.com/dapplink-labs/multichain-sync-btc/database"
 	flags2 "github.com/dapplink-labs/multichain-sync-btc/flags"
 	"github.com/dapplink-labs/multichain-sync-btc/notifier"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/btc"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient/utxo"
 	"github.com/dapplink-labs/multichain-sync-btc/services"
 )
 
@@ -64,8 +64,8 @@ func runRpc(ctx *cli.Context, shutdown context.CancelCauseFunc) (cliapp.Lifecycl
 		log.Error("Connect to da retriever fail", "err", err)
 		return nil, err
 	}
-	client := btc.NewWalletBtcServiceClient(conn)
-	accountClient, err := rpcclient.NewWalletBtcAccountClient(context.Background(), client, "Ethereum")
+	client := utxo.NewWalletUtxoServiceClient(conn)
+	accountClient, err := syncclient.NewWalletBtcAccountClient(context.Background(), client, "Ethereum")
 	if err != nil {
 		log.Error("new wallet account client fail", "err", err)
 		return nil, err

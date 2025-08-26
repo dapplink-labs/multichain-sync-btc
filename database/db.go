@@ -20,6 +20,7 @@ type DB struct {
 
 	CreateTable  CreateTableDB
 	Blocks       BlocksDB
+	ReorgBlocks  ReorgBlocksDB
 	Addresses    AddressesDB
 	Balances     BalancesDB
 	Business     BusinessDB
@@ -65,6 +66,7 @@ func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
 		gorm:         gorm,
 		CreateTable:  NewCreateTableDB(gorm),
 		Blocks:       NewBlocksDB(gorm),
+		ReorgBlocks:  NewReorgBlocksDB(gorm),
 		Addresses:    NewAddressesDB(gorm),
 		Balances:     NewBalancesDB(gorm),
 		Business:     NewBusinessDB(gorm),
@@ -83,6 +85,7 @@ func (db *DB) Transaction(fn func(db *DB) error) error {
 		txDB := &DB{
 			gorm:         tx,
 			Blocks:       NewBlocksDB(tx),
+			ReorgBlocks:  NewReorgBlocksDB(tx),
 			Addresses:    NewAddressesDB(tx),
 			Balances:     NewBalancesDB(tx),
 			Business:     NewBusinessDB(tx),

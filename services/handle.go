@@ -13,6 +13,11 @@ import (
 	"github.com/dapplink-labs/multichain-sync-btc/database"
 	"github.com/dapplink-labs/multichain-sync-btc/database/dynamic"
 	dal_wallet_go "github.com/dapplink-labs/multichain-sync-btc/protobuf/dal-wallet-go"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient/utxo"
+)
+
+const (
+	ConsumerToken = "DappLink123456"
 )
 
 func (bws *BusinessMiddleWireServices) BusinessRegister(ctx context.Context, request *dal_wallet_go.BusinessRegisterRequest) (*dal_wallet_go.BusinessRegisterResponse, error) {
@@ -50,7 +55,7 @@ func (bws *BusinessMiddleWireServices) ExportAddressesByPublicKeys(ctx context.C
 		balances      []database.Balances
 	)
 	for _, value := range request.PublicKeys {
-		address := bws.btcClient.ExportAddressByPubKey(value.Format, value.PublicKey)
+		address := bws.syncClient.ExportAddressByPubKey(value.Format, value.PublicKey)
 		item := &dal_wallet_go.Address{
 			Type:    value.Type,
 			Address: address,
@@ -105,20 +110,51 @@ func (bws *BusinessMiddleWireServices) BuildUnSignTransaction(ctx context.Contex
 	if !ok {
 		return nil, fmt.Errorf("invalid amount value: %s", request.Txn[0].Value)
 	}
-	// todo: fee docking to fee 预估器
-	fee := big.NewInt(0)
-	switch request.Txn[0].TxType {
-	case "withdraw":
-		if err := bws.storeWithdraw(request, amountBig, fee); err != nil {
-			return nil, fmt.Errorf("store withdraw failed: %w", err)
-		}
-	case "collection", "hot2cold":
-		if err := bws.storeInternal(request, amountBig, fee); err != nil {
-			return nil, fmt.Errorf("store internal transaction failed: %w", err)
-		}
-	default:
-		fmt.Println("aaa")
+
+	feeReq := &utxo.FeeRequest{
+		ConsumerToken: ConsumerToken,
+		Chain:         bws.BusinessMiddleConfig.ChainName,
+		Network:       bws.BusinessMiddleConfig.NetWork,
+		Coin:          bws.BusinessMiddleConfig.CoinName,
+		RawTx:         "",
 	}
+
+	utxoFee, err := bws.syncClient.BtcRpcClient.GetFee(context.Background(), feeReq)
+	if err != nil {
+		log.Error("get btc fee fail", "err", err)
+		return nil, err
+	}
+
+	btcSt := utxoFee.FeeRate * 10e8
+
+	btcStStr := fmt.Sprintf("%f", btcSt) // 每个字节消耗手续费聪
+
+	/*
+	 根据是 taproot，隔离见证或者legacy 的预估单个 input 和 output 字节数，再根据 input 和 output 的数量做出总字节数
+	 再去乘以单个字节需要消耗聪的手续，得到的就是这笔交易的手续费
+
+	 如果铭文和符石，直接先进行一次预签名进行，铭文和符石，一个 witness, 一个 op-return, 不管是在那个结构里面都是要消耗的手续
+	*/
+
+	btcStBigIntFee, _ := new(big.Int).SetString(btcStStr, 10)
+
+	utr := &utxo.UnSignTransactionRequest{
+		ConsumerToken: ConsumerToken,
+		Chain:         bws.BusinessMiddleConfig.ChainName,
+		Network:       bws.BusinessMiddleConfig.NetWork,
+		Fee:           btcStStr, // 每个字节消耗手续费聪
+	}
+
+	txMessageHash, err := bws.syncClient.BtcRpcClient.CreateUnSignTransaction(context.Background(), utr)
+	if err != nil {
+		log.Error("create un sign transaction fail", "err", err)
+		return nil, err
+	}
+	log.Info("txMessageHash", "txMessageHash", txMessageHash)
+	if err := bws.storeWithdraw(request, amountBig, btcStBigIntFee); err != nil {
+		return nil, fmt.Errorf("store withdraw failed: %w", err)
+	}
+
 	return nil, nil
 }
 
@@ -138,9 +174,6 @@ func (bws *BusinessMiddleWireServices) storeWithdraw(request *dal_wallet_go.UnSi
 		BlockHash:   "",
 		BlockNumber: big.NewInt(1),
 		Hash:        "",
-		FromAddress: request.Txn[0].From,
-		ToAddress:   request.Txn[0].To,
-		Amount:      amountBig.String(),
 		Fee:         amountBig,
 		TxSignHex:   "",
 	}
@@ -155,9 +188,6 @@ func (bws *BusinessMiddleWireServices) storeInternal(request *dal_wallet_go.UnSi
 		BlockHash:   "",
 		BlockNumber: big.NewInt(1),
 		Hash:        "",
-		FromAddress: request.Txn[0].From,
-		ToAddress:   request.Txn[0].To,
-		Amount:      amountBig.String(),
 		Fee:         fee,
 		TxSignHex:   "",
 	}

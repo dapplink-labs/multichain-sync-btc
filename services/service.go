@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient"
 	"net"
 	"sync/atomic"
 
@@ -13,7 +14,6 @@ import (
 
 	"github.com/dapplink-labs/multichain-sync-btc/database"
 	"github.com/dapplink-labs/multichain-sync-btc/protobuf/dal-wallet-go"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient"
 )
 
 const MaxRecvMessageSize = 1024 * 1024 * 300
@@ -21,13 +21,16 @@ const MaxRecvMessageSize = 1024 * 1024 * 300
 type BusinessMiddleConfig struct {
 	GrpcHostname string
 	GrpcPort     int
+	ChainName    string
+	NetWork      string
+	CoinName     string
 }
 
 type BusinessMiddleWireServices struct {
 	*BusinessMiddleConfig
-	btcClient *rpcclient.WalletBtcAccountClient
-	db        *database.DB
-	stopped   atomic.Bool
+	syncClient *syncclient.WalletBtcAccountClient
+	db         *database.DB
+	stopped    atomic.Bool
 }
 
 func (bws *BusinessMiddleWireServices) Stop(ctx context.Context) error {
@@ -39,10 +42,10 @@ func (bws *BusinessMiddleWireServices) Stopped() bool {
 	return bws.stopped.Load()
 }
 
-func NewBusinessMiddleWireServices(db *database.DB, config *BusinessMiddleConfig, btcClient *rpcclient.WalletBtcAccountClient) (*BusinessMiddleWireServices, error) {
+func NewBusinessMiddleWireServices(db *database.DB, config *BusinessMiddleConfig, syncClient *syncclient.WalletBtcAccountClient) (*BusinessMiddleWireServices, error) {
 	return &BusinessMiddleWireServices{
 		BusinessMiddleConfig: config,
-		btcClient:            btcClient,
+		syncClient:           syncClient,
 		db:                   db,
 	}, nil
 }

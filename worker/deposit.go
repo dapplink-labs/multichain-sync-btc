@@ -15,26 +15,26 @@ import (
 	"github.com/dapplink-labs/multichain-sync-btc/common/tasks"
 	"github.com/dapplink-labs/multichain-sync-btc/config"
 	"github.com/dapplink-labs/multichain-sync-btc/database"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient"
 )
 
 type Deposit struct {
 	BaseSynchronizer
 
 	confirms       uint8
-	latestHeader   rpcclient.BlockHeader
+	latestHeader   syncclient.BlockHeader
 	resourceCtx    context.Context
 	resourceCancel context.CancelFunc
 	tasks          tasks.Group
 }
 
-func NewDeposit(cfg *config.Config, db *database.DB, rpcClient *rpcclient.WalletBtcAccountClient, shutdown context.CancelCauseFunc) (*Deposit, error) {
+func NewDeposit(cfg *config.Config, db *database.DB, rpcClient *syncclient.WalletBtcAccountClient, shutdown context.CancelCauseFunc) (*Deposit, error) {
 	dbLatestBlockHeader, err := db.Blocks.LatestBlocks()
 	if err != nil {
 		log.Error("get latest block from database fail")
 		return nil, err
 	}
-	var fromHeader *rpcclient.BlockHeader
+	var fromHeader *syncclient.BlockHeader
 
 	if dbLatestBlockHeader != nil {
 		log.Info("sync bock", "number", dbLatestBlockHeader.Number, "hash", dbLatestBlockHeader.Hash)
@@ -62,7 +62,7 @@ func NewDeposit(cfg *config.Config, db *database.DB, rpcClient *rpcclient.Wallet
 		headerBufferSize: cfg.ChainNode.BlocksStep,
 		businessChannels: businessTxChannel,
 		rpcClient:        rpcClient,
-		blockBatch:       rpcclient.NewBatchBlock(rpcClient, fromHeader, big.NewInt(int64(cfg.ChainNode.Confirmations))),
+		blockBatch:       syncclient.NewBatchBlock(rpcClient, fromHeader, big.NewInt(int64(cfg.ChainNode.Confirmations))),
 		database:         db,
 	}
 
@@ -266,10 +266,7 @@ func (deposit *Deposit) HandleDeposit(tx *Transaction) (database.Deposits, error
 		BlockHash:   "",
 		BlockNumber: tx.BlockNumber,
 		Hash:        tx.Hash,
-		FromAddress: "",
-		ToAddress:   addressString,
 		Fee:         txFee,
-		Amount:      amountStrig,
 		Status:      0,
 		Timestamp:   uint64(time.Now().Unix()),
 	}
@@ -298,9 +295,6 @@ func (deposit *Deposit) HandleWithdraw(tx *Transaction) (database.Withdraws, err
 		BlockHash:   "",
 		BlockNumber: tx.BlockNumber,
 		Hash:        tx.Hash,
-		FromAddress: addressString,
-		ToAddress:   addressToString,
-		Amount:      amountString,
 		Fee:         txFee,
 		Status:      uint8(database.TxStatusWalletDone),
 		Timestamp:   uint64(time.Now().Unix()),
@@ -334,11 +328,8 @@ func (deposit *Deposit) HandleTransaction(tx *Transaction) (database.Transaction
 		BlockHash:   "",
 		BlockNumber: tx.BlockNumber,
 		Hash:        tx.Hash,
-		FromAddress: fromAddressString,
-		ToAddress:   toAddressString,
 		Fee:         txFee,
 		Status:      0,
-		Amount:      amountString,
 		TxType:      tx.TxType,
 		Timestamp:   uint64(time.Now().Unix()),
 	}
@@ -347,7 +338,6 @@ func (deposit *Deposit) HandleTransaction(tx *Transaction) (database.Transaction
 
 func (deposit *Deposit) HandleInternalTx(tx *Transaction) (database.Internals, error) {
 	txFee, _ := new(big.Int).SetString(tx.TxFee, 10)
-	var amountString string
 	var fromAddressString, toAddressString, userAmountString, hotAmountString, coldAmountSring string
 	if tx.TxType == "collection" { // 用户地址到热钱包地址
 		for _, voutItem := range tx.VoutList {
@@ -363,7 +353,6 @@ func (deposit *Deposit) HandleInternalTx(tx *Transaction) (database.Internals, e
 				hotAmountString += "|" + vinTx.Amount.String()
 			}
 		}
-		amountString = "user" + userAmountString + "hotwallet" + hotAmountString
 	}
 
 	if tx.TxType == "hot2cold" { // 热转冷
@@ -379,7 +368,6 @@ func (deposit *Deposit) HandleInternalTx(tx *Transaction) (database.Internals, e
 				coldAmountSring += "|" + vinTx.Amount.String()
 			}
 		}
-		amountString = "hotwallet" + hotAmountString + "coldtwallet" + coldAmountSring
 	}
 	if tx.TxType == "cold2hot" { // 冷转热  to
 		for _, voutItem := range tx.VoutList {
@@ -395,17 +383,13 @@ func (deposit *Deposit) HandleInternalTx(tx *Transaction) (database.Internals, e
 				hotAmountString += "|" + vinTx.Amount.String()
 			}
 		}
-		amountString = "coldtwallet" + coldAmountSring + "hotwallet" + hotAmountString
 	}
 	internalTx := database.Internals{
 		Guid:        uuid.New(),
 		BlockHash:   "",
 		BlockNumber: tx.BlockNumber,
 		Hash:        tx.Hash,
-		FromAddress: fromAddressString,
-		ToAddress:   toAddressString,
 		Status:      1,
-		Amount:      amountString,
 		Fee:         txFee,
 		Timestamp:   uint64(time.Now().Unix()),
 	}

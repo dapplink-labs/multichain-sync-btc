@@ -11,11 +11,11 @@ import (
 	"github.com/dapplink-labs/multichain-sync-btc/common/tasks"
 	"github.com/dapplink-labs/multichain-sync-btc/config"
 	"github.com/dapplink-labs/multichain-sync-btc/database"
-	"github.com/dapplink-labs/multichain-sync-btc/rpcclient"
+	"github.com/dapplink-labs/multichain-sync-btc/rpcclient/syncclient"
 )
 
 type FallBack struct {
-	rpcClient      *rpcclient.WalletBtcAccountClient
+	rpcClient      *syncclient.WalletBtcAccountClient
 	db             *database.DB
 	resourceCtx    context.Context
 	resourceCancel context.CancelFunc
@@ -23,7 +23,7 @@ type FallBack struct {
 	ticker         *time.Ticker
 }
 
-func NewFallBack(cfg *config.Config, db *database.DB, rpcClient *rpcclient.WalletBtcAccountClient, shutdown context.CancelCauseFunc) (*FallBack, error) {
+func NewFallBack(cfg *config.Config, db *database.DB, rpcClient *syncclient.WalletBtcAccountClient, shutdown context.CancelCauseFunc) (*FallBack, error) {
 	resCtx, resCancel := context.WithCancel(context.Background())
 	return &FallBack{
 		rpcClient:      rpcClient,
