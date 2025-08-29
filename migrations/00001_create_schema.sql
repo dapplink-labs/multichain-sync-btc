@@ -167,6 +167,7 @@ CREATE INDEX IF NOT EXISTS transactions_timestamp ON transactions (timestamp);
 CREATE TABLE IF NOT EXISTS child_txs (
     guid          VARCHAR PRIMARY KEY,
     hash          VARCHAR  NOT NULL,
+    tx_id          VARCHAR  NOT NULL,
     tx_index      UINT256  NOT NULL,
     from_address  VARCHAR  NOT NULL,
     to_address    VARCHAR  NOT NULL,

@@ -162,34 +162,71 @@ func (bws *BusinessMiddleWireServices) BuildSignedTransaction(ctx context.Contex
 	return nil, nil
 }
 
+func (bws *BusinessMiddleWireServices) SubmitWithdraw(ctx context.Context, request *dal_wallet_go.SubmitWithdrawRequest) (*dal_wallet_go.SubmitWithdrawResponse, error) {
+	resp := &dal_wallet_go.SubmitWithdrawResponse{
+		Code: dal_wallet_go.ReturnCode_ERROR,
+		Msg:  "submit withdraw fail",
+	}
+	if request.ConsumerToken != ConsumerToken {
+		resp.Msg = "consumer token is error"
+		return resp, nil
+	}
+	var childTxList []database.ChildTxs
+	txId := uuid.New()
+	withdrawTimeStamp := uint64(time.Now().Unix())
+	for _, withdraw := range request.WithdrawList {
+		childTx := database.ChildTxs{
+			GUID:        uuid.New(),
+			Hash:        "0x0",
+			TxId:        txId.String(),
+			TxIndex:     big.NewInt(0),
+			TxType:      "withdraw",
+			FromAddress: "hotwallet",
+			ToAddress:   withdraw.Address,
+			Amount:      withdraw.Value,
+			Timestamp:   withdrawTimeStamp,
+		}
+		childTxList = append(childTxList, childTx)
+	}
+	withdraw := &database.Withdraws{
+		Guid:        uuid.New(),
+		BlockHash:   "0x0",
+		BlockNumber: big.NewInt(0),
+		Hash:        "0x0",
+		Fee:         big.NewInt(0),
+		LockTime:    big.NewInt(0),
+		Version:     "0x0",
+		TxSignHex:   "0x0",
+		Status:      database.TxStatusWaitSign,
+		Timestamp:   withdrawTimeStamp,
+	}
+	if err := bws.db.Transaction(func(tx *database.DB) error {
+		if len(childTxList) > 0 {
+			if err := tx.ChildTxs.StoreChildTxs(request.RequestId, childTxList); err != nil {
+				log.Error("store child txs fail", "err", err)
+				return err
+			}
+		}
+		if err := tx.Withdraws.StoreWithdraws(request.RequestId, withdraw); err != nil {
+			log.Error("store child txs fail", "err", err)
+			return err
+		}
+		return nil
+	}); err != nil {
+		log.Error("unable to persist withdraw tx batch", "err", err)
+		return nil, err
+	}
+	return nil, nil
+}
+
 func validateRequest(request *dal_wallet_go.UnSignWithdrawTransactionRequest) error {
 	return nil
 }
 
 func (bws *BusinessMiddleWireServices) storeWithdraw(request *dal_wallet_go.UnSignWithdrawTransactionRequest, amountBig *big.Int, fee *big.Int) error {
-	withdraw := &database.Withdraws{
-		Guid:        uuid.New(),
-		Timestamp:   uint64(time.Now().Unix()),
-		Status:      uint8(database.TxStatusUnsigned),
-		BlockHash:   "",
-		BlockNumber: big.NewInt(1),
-		Hash:        "",
-		Fee:         amountBig,
-		TxSignHex:   "",
-	}
-	return bws.db.Withdraws.StoreWithdraws(request.RequestId, withdraw)
+	return nil
 }
 
 func (bws *BusinessMiddleWireServices) storeInternal(request *dal_wallet_go.UnSignWithdrawTransactionRequest, amountBig *big.Int, fee *big.Int) error {
-	internal := &database.Internals{
-		Guid:        uuid.New(),
-		Timestamp:   uint64(time.Now().Unix()),
-		Status:      uint8(database.TxStatusUnsigned),
-		BlockHash:   "",
-		BlockNumber: big.NewInt(1),
-		Hash:        "",
-		Fee:         fee,
-		TxSignHex:   "",
-	}
-	return bws.db.Internals.StoreInternal(request.RequestId, internal)
+	return nil
 }

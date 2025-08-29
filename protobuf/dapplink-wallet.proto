@@ -98,9 +98,32 @@ message SignedWithdrawTransactionResponse {
   repeated  ReturnSignedTransactions return_sign_txn = 3;
 }
 
+message Withdraw {
+  string chain_id = 1;
+  string address = 2;
+  string value = 3;
+  string fee = 4;
+}
+
+message SubmitWithdrawRequest{
+  string consumer_token = 1;
+  string request_id = 2;
+  repeated Withdraw withdraw_list = 3;
+}
+
+message SubmitWithdrawResponse {
+  ReturnCode code = 1;
+  string msg = 2;
+}
+
 service BusinessMiddleWireServices {
   rpc businessRegister(BusinessRegisterRequest) returns (BusinessRegisterResponse) {}
   rpc exportAddressesByPublicKeys(ExportAddressesRequest) returns (ExportAddressesResponse) {}
+
+
   rpc buildUnSignTransaction(UnSignWithdrawTransactionRequest) returns(UnSignWithdrawTransactionResponse){}
   rpc buildSignedTransaction(SignedWithdrawTransactionRequest) returns(SignedWithdrawTransactionResponse){}
+
+  //--提交提现交易--
+  rpc submitWithdraw(SubmitWithdrawRequest) returns (SubmitWithdrawResponse) {}
 }

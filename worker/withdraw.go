@@ -90,7 +90,7 @@ func (w *Withdraw) Start() error {
 							continue
 						} else {
 							unSendTransaction.Hash = txHash
-							unSendTransaction.Status = uint8(database.TxStatusBroadcasted)
+							unSendTransaction.Status = database.TxStatusSent
 						}
 					}
 					retryStrategy := &retry.ExponentialStrategy{Min: 1000, Max: 20_000, MaxJitter: 250}
@@ -105,7 +105,7 @@ func (w *Withdraw) Start() error {
 
 							}
 							if len(unSendTransactionList) > 0 {
-								err = w.db.Withdraws.UpdateWithdrawStatus(businessId.BusinessUid, database.TxStatusBroadcasted, unSendTransactionList)
+								err = w.db.Withdraws.UpdateWithdrawStatus(businessId.BusinessUid, database.TxStatusSent, unSendTransactionList)
 								if err != nil {
 									log.Error("update withdraw status fail", "err", err)
 									return err

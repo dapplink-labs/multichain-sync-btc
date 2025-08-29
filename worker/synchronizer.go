@@ -23,9 +23,8 @@ type Vin struct {
 
 type Vout struct {
 	Address string
-	N       uint8
-	//Script  *utxo.ScriptPubKey
-	Amount *big.Int
+	TxIndex uint8
+	Amount  *big.Int
 }
 
 type Transaction struct {
@@ -146,15 +145,13 @@ func (syncer *BaseSynchronizer) processBatch(headers []syncclient.BlockHeader) e
 					TxType:      "unknown",
 				}
 				var toAddressList []string
-				var amountList []string
 				var voutArray []Vout
 				var vinArray []Vin
 				for _, vout := range tx.Vout {
 					toAddressList = append(toAddressList, vout.Address)
-					amountList = append(amountList, big.NewInt(int64(vout.Amount)).String())
 					voutItem := Vout{
 						Address: vout.Address,
-						N:       uint8(vout.Index),
+						TxIndex: uint8(vout.Index),
 						Amount:  big.NewInt(int64(vout.Amount)),
 					}
 					voutArray = append(voutArray, voutItem)
@@ -179,8 +176,8 @@ func (syncer *BaseSynchronizer) processBatch(headers []syncclient.BlockHeader) e
 						vinItem := Vin{
 							Address: txVin.Address,
 							TxId:    tx.Hash,
-							// Vout:    uint8(txVin.Vout),
-							Amount: big.NewInt(int64(txVin.Amount)),
+							Vout:    uint8(txVin.Index),
+							Amount:  big.NewInt(int64(txVin.Amount)),
 						}
 						vinArray = append(vinArray, vinItem)
 						addressList := strings.Split(txVin.Address, "|")
@@ -241,6 +238,15 @@ func (syncer *BaseSynchronizer) processBatch(headers []syncclient.BlockHeader) e
 					businessTxChannel[businessId.BusinessUid].Transactions = append(businessTxChannel[businessId.BusinessUid].Transactions, businessTransactions...)
 				}
 			}
+		}
+	}
+	if len(businessTxChannel) >= 0 {
+		syncer.businessChannels <- businessTxChannel
+	}
+	if len(blockHeaders) > 0 {
+		log.Info("Store block headers success", "totalBlockHeader", len(blockHeaders))
+		if err := syncer.database.Blocks.StoreBlockss(blockHeaders); err != nil {
+			return err
 		}
 	}
 	return nil

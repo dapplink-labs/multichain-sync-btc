@@ -2,10 +2,12 @@ package database
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/google/uuid"
+
 	"gorm.io/gorm"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/google/uuid"
 )
 
 type Withdraws struct {
@@ -17,7 +19,7 @@ type Withdraws struct {
 	LockTime    *big.Int  `gorm:"serializer:u256" json:"lock_time"`
 	Version     string    `json:"version"`
 	TxSignHex   string    `json:"tx_sign_hex"`
-	Status      uint8     `gorm:"default:0" json:"status"`
+	Status      TxStatus  `json:"status"`
 	Timestamp   uint64    `json:"timestamp"`
 }
 
@@ -61,7 +63,7 @@ func (db *withdrawsDB) UpdateWithdrawStatus(requestId string, status TxStatus, w
 
 		result := tx.Table(tableName).
 			Where("guid IN ?", guids).
-			Where("status = ?", TxStatusWalletDone).
+			Where("status = ?", TxStatusWithdrawed).
 			Update("status", status)
 
 		if result.Error != nil {
@@ -88,7 +90,7 @@ func (db *withdrawsDB) UpdateWithdrawStatus(requestId string, status TxStatus, w
 func (db *withdrawsDB) QueryNotifyWithdraws(requestId string) ([]Withdraws, error) {
 	var notifyWithdraws []Withdraws
 	result := db.gorm.Table("withdraws_"+requestId).
-		Where("status = ?", TxStatusWalletDone).
+		Where("status = ?", TxStatusWithdrawed).
 		Find(&notifyWithdraws)
 
 	if result.Error != nil {
@@ -101,7 +103,7 @@ func (db *withdrawsDB) QueryNotifyWithdraws(requestId string) ([]Withdraws, erro
 func (db *withdrawsDB) UnSendWithdrawsList(requestId string) ([]Withdraws, error) {
 	var withdrawsList []Withdraws
 	err := db.gorm.Table("withdraws_"+requestId).
-		Where("status = ?", TxStatusSigned).
+		Where("status = ?", TxStatusUnSent).
 		Find(&withdrawsList).Error
 
 	if err != nil {

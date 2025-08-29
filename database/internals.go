@@ -18,7 +18,7 @@ type Internals struct {
 	Version     string    `json:"version"`
 	TxType      string    `json:"tx_type"`
 	TxSignHex   string    `json:"tx_sign_hex"`
-	Status      uint8     `gorm:"default:0" json:"status"`
+	Status      TxStatus  `json:"status"`
 	Timestamp   uint64    `json:"timestamp"`
 }
 
@@ -46,7 +46,7 @@ func NewInternalsDB(db *gorm.DB) InternalsDB {
 func (db *internalsDB) QueryNotifyInternal(requestId string) ([]Internals, error) {
 	var notifyInternals []Internals
 	result := db.gorm.Table("internals_"+requestId).
-		Where("status = ?", TxStatusWalletDone).
+		Where("status = ?", TxStatusSuccess).
 		Find(&notifyInternals)
 	if result.Error != nil {
 		return nil, result.Error
@@ -96,7 +96,7 @@ func (db *internalsDB) UpdateInternalStatus(requestId string, status TxStatus, i
 
 		result := tx.Table(tableName).
 			Where("guid IN ?", guids).
-			Where("status = ?", TxStatusWalletDone).
+			Where("status = ?", TxStatusSuccess).
 			Update("status", status)
 
 		if result.Error != nil {
@@ -123,7 +123,7 @@ func (db *internalsDB) UpdateInternalStatus(requestId string, status TxStatus, i
 func (db *internalsDB) UnSendInternalsList(requestId string) ([]Internals, error) {
 	var internalsList []Internals
 	err := db.gorm.Table("internals_"+requestId).
-		Where("status = ?", TxStatusSigned).
+		Where("status = ?", TxStatusUnSent).
 		Find(&internalsList).Error
 	if err != nil {
 		return nil, err

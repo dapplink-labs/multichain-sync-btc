@@ -88,7 +88,7 @@ func (w *Internal) Start() error {
 							continue
 						} else {
 							unSendInternalTx.Hash = txHash
-							unSendInternalTx.Status = uint8(database.TxStatusBroadcasted)
+							unSendInternalTx.Status = database.TxStatusSuccess
 						}
 					}
 
@@ -103,7 +103,7 @@ func (w *Internal) Start() error {
 								}
 							}
 							if len(unSendInternalTxList) > 0 {
-								err = w.db.Internals.UpdateInternalStatus(businessId.BusinessUid, database.TxStatusWalletDone, unSendInternalTxList)
+								err = w.db.Internals.UpdateInternalStatus(businessId.BusinessUid, database.TxStatusSuccess, unSendInternalTxList)
 								if err != nil {
 									log.Error("update internals status fail", "err", err)
 									return err

@@ -18,7 +18,7 @@ type Deposits struct {
 	LockTime    *big.Int `gorm:"serializer:u256"`
 	Version     string   `json:"version"`
 	Confirms    uint8    `json:"confirms"`
-	Status      uint8    `json:"status"`
+	Status      TxStatus `json:"status"`
 	Timestamp   uint64   `json:"timestamp"`
 }
 
@@ -77,7 +77,7 @@ func (db *depositsDB) UpdateDepositsComfirms(requestId string, blockNumber uint6
 		chainConfirm := blockNumber - deposit.BlockNumber.Uint64()
 		if chainConfirm >= confirms {
 			deposit.Confirms = uint8(confirms)
-			deposit.Status = 1 // 已经过了确认位
+			deposit.Status = TxStatusFinalized // 已经过了确认位
 		} else {
 			deposit.Confirms = uint8(chainConfirm)
 		}
@@ -99,7 +99,7 @@ func (db *depositsDB) UpdateDepositsNotifyStatus(requestId string, status uint8,
 			}
 			return result.Error
 		}
-		depositSingle.Status = status
+		depositSingle.Status = TxStatusFinalizedNotify
 		err := db.gorm.Table("transactions_" + requestId).Save(&depositSingle).Error
 		if err != nil {
 			return err

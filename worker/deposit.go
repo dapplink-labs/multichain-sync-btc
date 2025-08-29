@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/google/uuid"
 
 	"github.com/dapplink-labs/multichain-sync-btc/common/retry"
 	"github.com/dapplink-labs/multichain-sync-btc/common/tasks"
@@ -20,7 +20,6 @@ import (
 
 type Deposit struct {
 	BaseSynchronizer
-
 	confirms       uint8
 	latestHeader   syncclient.BlockHeader
 	resourceCtx    context.Context
@@ -122,13 +121,17 @@ func (deposit *Deposit) handleBatch(batch map[string]*TransactionsChannel) error
 		}
 
 		var (
-			transactionFlowList []database.Transactions
-			depositList         []database.Deposits
-			withdrawList        []database.Withdraws
-			internals           []database.Internals
-			vins                []database.Vins
-			vouts               []database.Vouts
-			balances            []database.TokenBalance
+			transactionFlowList         []database.Transactions
+			transactionChildTxFlowList  []database.ChildTxs
+			depositList                 []database.Deposits
+			withdrawList                []database.Withdraws
+			internals                   []database.Internals
+			depositListChildTxFlowList  []database.ChildTxs
+			withdrawListChildTxFlowList []database.ChildTxs
+			internalsChildTxFlowList    []database.ChildTxs
+			vins                        []database.Vins
+			vouts                       []database.Vouts
+			balances                    []database.TokenBalance
 		)
 
 		log.Info("handle business flow", "businessId", business.BusinessUid, "chainLatestBlock", batch[business.BusinessUid].BlockHeight, "txn", len(batch[business.BusinessUid].Transactions))
@@ -142,12 +145,13 @@ func (deposit *Deposit) handleBatch(batch map[string]*TransactionsChannel) error
 			}
 
 			log.Info("get transaction success", "txHash", txItem.Hash)
-			transactionFlow, err := deposit.HandleTransaction(tx)
+			transactionFlow, transactionFlowChildTxs, err := deposit.HandleTransaction(tx)
 			if err != nil {
 				log.Info("handle  transaction fail", "err", err)
 				return err
 			}
 			transactionFlowList = append(transactionFlowList, transactionFlow)
+			transactionChildTxFlowList = append(transactionChildTxFlowList, transactionFlowChildTxs...)
 
 			vintListPre, vinBalances, err := deposit.HandleVin(tx)
 			if err != nil {
@@ -168,15 +172,18 @@ func (deposit *Deposit) handleBatch(batch map[string]*TransactionsChannel) error
 
 			switch tx.TxType {
 			case "deposit":
-				depositItem, _ := deposit.HandleDeposit(tx)
+				depositItem, depositChildTxn, _ := deposit.HandleDeposit(tx)
 				depositList = append(depositList, depositItem)
+				depositListChildTxFlowList = append(depositListChildTxFlowList, depositChildTxn...)
 				break
 			case "withdraw":
-				withdrawItem, _ := deposit.HandleWithdraw(tx)
+				withdrawItem, withdrawChildTxn, _ := deposit.HandleWithdraw(tx)
+				withdrawListChildTxFlowList = append(withdrawListChildTxFlowList, withdrawChildTxn...)
 				withdrawList = append(withdrawList, withdrawItem)
 				break
 			case "collection", "hot2cold", "cold2hot":
-				internelItem, _ := deposit.HandleInternalTx(tx)
+				internelItem, internalChildTxn, _ := deposit.HandleInternalTx(tx)
+				internalsChildTxFlowList = append(internalsChildTxFlowList, internalChildTxn...)
 				internals = append(internals, internelItem)
 				break
 			default:
@@ -191,33 +198,42 @@ func (deposit *Deposit) handleBatch(batch map[string]*TransactionsChannel) error
 					if err := tx.Deposits.StoreDeposits(business.BusinessUid, depositList); err != nil {
 						return err
 					}
-				}
 
+					if err := tx.ChildTxs.StoreChildTxs(business.BusinessUid, depositListChildTxFlowList); err != nil {
+						return err
+					}
+				}
 				if err := tx.Deposits.UpdateDepositsComfirms(business.BusinessUid, batch[business.BusinessUid].BlockHeight, uint64(deposit.confirms)); err != nil {
 					log.Info("Handle confims fail", "totalTx", "err", err)
 					return err
 				}
-
 				if len(balances) > 0 {
 					log.Info("Handle balances success", "totalTx", len(balances))
 					if err := tx.Balances.UpdateOrCreate(business.BusinessUid, balances); err != nil {
 						return err
 					}
 				}
-
 				if len(withdrawList) > 0 {
-					if err := tx.Withdraws.UpdateWithdrawStatus(business.BusinessUid, database.TxStatusWalletDone, withdrawList); err != nil {
+					if err := tx.Withdraws.UpdateWithdrawStatus(business.BusinessUid, database.TxStatusWithdrawed, withdrawList); err != nil {
+						return err
+					}
+					if err := tx.ChildTxs.StoreChildTxs(business.BusinessUid, withdrawListChildTxFlowList); err != nil {
 						return err
 					}
 				}
-
 				if len(internals) > 0 {
-					if err := tx.Internals.UpdateInternalStatus(business.BusinessUid, database.TxStatusWalletDone, internals); err != nil {
+					if err := tx.Internals.UpdateInternalStatus(business.BusinessUid, database.TxStatusSuccess, internals); err != nil {
+						return err
+					}
+					if err := tx.ChildTxs.StoreChildTxs(business.BusinessUid, internalsChildTxFlowList); err != nil {
 						return err
 					}
 				}
 				if len(transactionFlowList) > 0 {
 					if err := tx.Transactions.StoreTransactions(business.BusinessUid, transactionFlowList); err != nil {
+						return err
+					}
+					if err := tx.ChildTxs.StoreChildTxs(business.BusinessUid, transactionChildTxFlowList); err != nil {
 						return err
 					}
 				}
@@ -231,6 +247,7 @@ func (deposit *Deposit) handleBatch(batch map[string]*TransactionsChannel) error
 						return err
 					}
 				}
+
 				if len(pvList) > 0 {
 					for _, pvItem := range pvList {
 						for _, voutItmepv := range pvItem.VoutList {
@@ -253,12 +270,20 @@ func (deposit *Deposit) handleBatch(batch map[string]*TransactionsChannel) error
 	return nil
 }
 
-func (deposit *Deposit) HandleDeposit(tx *Transaction) (database.Deposits, error) {
-	var addressString string
-	var amountStrig string
+func (deposit *Deposit) HandleDeposit(tx *Transaction) (database.Deposits, []database.ChildTxs, error) {
+	var depositChildTx []database.ChildTxs
 	for _, voutItem := range tx.VoutList {
-		addressString += "|" + voutItem.Address
-		amountStrig += "|" + voutItem.Amount.String()
+		dChildTx := database.ChildTxs{
+			GUID:        uuid.New(),
+			Hash:        tx.Hash,
+			TxIndex:     big.NewInt(int64(voutItem.TxIndex)),
+			TxType:      "deposit",
+			FromAddress: "",
+			ToAddress:   voutItem.Address,
+			Amount:      voutItem.Amount.String(),
+			Timestamp:   uint64(time.Now().Unix()),
+		}
+		depositChildTx = append(depositChildTx, dChildTx)
 	}
 	txFee, _ := new(big.Int).SetString(tx.TxFee, 10)
 	depositTx := database.Deposits{
@@ -267,28 +292,27 @@ func (deposit *Deposit) HandleDeposit(tx *Transaction) (database.Deposits, error
 		BlockNumber: tx.BlockNumber,
 		Hash:        tx.Hash,
 		Fee:         txFee,
-		Status:      0,
+		Status:      database.TxStatusUnSafe,
 		Timestamp:   uint64(time.Now().Unix()),
 	}
-	return depositTx, nil
+	return depositTx, depositChildTx, nil
 }
 
-func (deposit *Deposit) HandleWithdraw(tx *Transaction) (database.Withdraws, error) {
+func (deposit *Deposit) HandleWithdraw(tx *Transaction) (database.Withdraws, []database.ChildTxs, error) {
 	txFee, _ := new(big.Int).SetString(tx.TxFee, 10)
-	var addressString string
-	var amountString string
+	var withdrawChildTx []database.ChildTxs
 	for _, vinItem := range tx.VinList {
-		addressString += "|" + vinItem.Address
-		// 根据 txid 和 address 查询 vin 表确定金额
-		addressList := strings.Split(vinItem.Address, "|")
-		for _, addressItem := range addressList {
-			vinTx, _ := deposit.database.Vins.QueryVinByTxId(tx.BusinessId, addressItem, tx.Hash)
-			amountString += "|" + vinTx.Amount.String()
+		wChildTx := database.ChildTxs{
+			GUID:        uuid.New(),
+			Hash:        tx.Hash,
+			TxIndex:     big.NewInt(int64(vinItem.Vout)),
+			TxType:      "withdraw",
+			FromAddress: vinItem.Address,
+			ToAddress:   "",
+			Amount:      vinItem.Amount.String(),
+			Timestamp:   uint64(time.Now().Unix()),
 		}
-	}
-	var addressToString string
-	for _, voutItem := range tx.VoutList {
-		addressToString += "|" + voutItem.Address
+		withdrawChildTx = append(withdrawChildTx, wChildTx)
 	}
 	withdrawTx := database.Withdraws{
 		Guid:        uuid.New(),
@@ -296,92 +320,146 @@ func (deposit *Deposit) HandleWithdraw(tx *Transaction) (database.Withdraws, err
 		BlockNumber: tx.BlockNumber,
 		Hash:        tx.Hash,
 		Fee:         txFee,
-		Status:      uint8(database.TxStatusWalletDone),
+		Status:      database.TxStatusWithdrawed,
 		Timestamp:   uint64(time.Now().Unix()),
 	}
-	return withdrawTx, nil
+	return withdrawTx, withdrawChildTx, nil
 }
 
-func (deposit *Deposit) HandleTransaction(tx *Transaction) (database.Transactions, error) {
+func (deposit *Deposit) HandleTransaction(tx *Transaction) (database.Transactions, []database.ChildTxs, error) {
 	txFee, _ := new(big.Int).SetString(tx.TxFee, 10)
-	var fromAddressString, toAddressString, amountString string
+	var childTxn []database.ChildTxs
+
 	if tx.TxType == "deposit" {
 		for _, voutItem := range tx.VoutList {
-			fromAddressString += "|" + voutItem.Address
-			amountString += "|" + voutItem.Amount.String()
+			childTx := database.ChildTxs{
+				GUID:        uuid.New(),
+				Hash:        tx.Hash,
+				TxIndex:     big.NewInt(int64(voutItem.TxIndex)),
+				TxType:      "deposit",
+				FromAddress: "",
+				ToAddress:   voutItem.Address,
+				Amount:      voutItem.Amount.String(),
+				Timestamp:   uint64(time.Now().Unix()),
+			}
+			childTxn = append(childTxn, childTx)
 		}
 	}
 
 	if tx.TxType == "withdraw" {
 		for _, vinItem := range tx.VinList {
-			toAddressString += "|" + vinItem.Address
-			addressList := strings.Split(vinItem.Address, "|")
-			for _, addressItem := range addressList {
-				vinTx, _ := deposit.database.Vins.QueryVinByTxId(tx.BusinessId, addressItem, tx.Hash)
-				amountString += "|" + vinTx.Amount.String()
+			childTx := database.ChildTxs{
+				GUID:        uuid.New(),
+				Hash:        tx.Hash,
+				TxIndex:     big.NewInt(int64(vinItem.Vout)),
+				TxType:      "withdraw",
+				FromAddress: "",
+				ToAddress:   vinItem.Address,
+				Amount:      vinItem.Amount.String(),
+				Timestamp:   uint64(time.Now().Unix()),
 			}
+			childTxn = append(childTxn, childTx)
 		}
 	}
-
 	transactionTx := database.Transactions{
 		GUID:        uuid.New(),
 		BlockHash:   "",
 		BlockNumber: tx.BlockNumber,
 		Hash:        tx.Hash,
 		Fee:         txFee,
-		Status:      0,
+		Status:      database.TxStatusSuccess,
 		TxType:      tx.TxType,
 		Timestamp:   uint64(time.Now().Unix()),
 	}
-	return transactionTx, nil
+	return transactionTx, childTxn, nil
 }
 
-func (deposit *Deposit) HandleInternalTx(tx *Transaction) (database.Internals, error) {
+func (deposit *Deposit) HandleInternalTx(tx *Transaction) (database.Internals, []database.ChildTxs, error) {
 	txFee, _ := new(big.Int).SetString(tx.TxFee, 10)
-	var fromAddressString, toAddressString, userAmountString, hotAmountString, coldAmountSring string
-	if tx.TxType == "collection" { // 用户地址到热钱包地址
+	var childTxn []database.ChildTxs
+	if tx.TxType == "collection" { // 用户地址到热钱包地址, 用户地址在 transactions vin, 对热钱包地址 vout
 		for _, voutItem := range tx.VoutList {
-			fromAddressString += "|" + voutItem.Address
-			userAmountString += "|" + voutItem.Amount.String()
-		}
-
-		for _, vinItem := range tx.VinList {
-			toAddressString += "|" + vinItem.Address
-			addressList := strings.Split(vinItem.Address, "|")
-			for _, addressItem := range addressList {
-				vinTx, _ := deposit.database.Vins.QueryVinByTxId(tx.BusinessId, addressItem, tx.Hash)
-				hotAmountString += "|" + vinTx.Amount.String()
+			childTx := database.ChildTxs{
+				GUID:        uuid.New(),
+				Hash:        tx.Hash,
+				TxIndex:     big.NewInt(int64(voutItem.TxIndex)),
+				TxType:      "hot_input",
+				FromAddress: "",
+				ToAddress:   voutItem.Address,
+				Amount:      voutItem.Amount.String(),
+				Timestamp:   uint64(time.Now().Unix()),
 			}
+			childTxn = append(childTxn, childTx)
+		}
+		for _, vinItem := range tx.VinList {
+			childTx := database.ChildTxs{
+				GUID:        uuid.New(),
+				Hash:        tx.Hash,
+				TxIndex:     big.NewInt(int64(vinItem.Vout)),
+				TxType:      "user_output",
+				FromAddress: "",
+				ToAddress:   vinItem.Address,
+				Amount:      vinItem.Amount.String(),
+				Timestamp:   uint64(time.Now().Unix()),
+			}
+			childTxn = append(childTxn, childTx)
 		}
 	}
-
 	if tx.TxType == "hot2cold" { // 热转冷
 		for _, voutItem := range tx.VoutList {
-			fromAddressString += "|" + voutItem.Address
-			hotAmountString += "|" + voutItem.Amount.String()
+			childTx := database.ChildTxs{
+				GUID:        uuid.New(),
+				Hash:        tx.Hash,
+				TxIndex:     big.NewInt(int64(voutItem.TxIndex)),
+				TxType:      "cold_input",
+				FromAddress: "",
+				ToAddress:   voutItem.Address,
+				Amount:      voutItem.Amount.String(),
+				Timestamp:   uint64(time.Now().Unix()),
+			}
+			childTxn = append(childTxn, childTx)
 		}
 		for _, vinItem := range tx.VinList {
-			toAddressString += "|" + vinItem.Address
-			addressList := strings.Split(vinItem.Address, "|")
-			for _, addressItem := range addressList {
-				vinTx, _ := deposit.database.Vins.QueryVinByTxId(tx.BusinessId, addressItem, tx.Hash)
-				coldAmountSring += "|" + vinTx.Amount.String()
+			childTx := database.ChildTxs{
+				GUID:        uuid.New(),
+				Hash:        tx.Hash,
+				TxIndex:     big.NewInt(int64(vinItem.Vout)),
+				TxType:      "hot_output",
+				FromAddress: "",
+				ToAddress:   vinItem.Address,
+				Amount:      vinItem.Amount.String(),
+				Timestamp:   uint64(time.Now().Unix()),
 			}
+			childTxn = append(childTxn, childTx)
 		}
 	}
 	if tx.TxType == "cold2hot" { // 冷转热  to
 		for _, voutItem := range tx.VoutList {
-			fromAddressString += "|" + voutItem.Address
-			coldAmountSring += "|" + voutItem.Amount.String()
+			childTx := database.ChildTxs{
+				GUID:        uuid.New(),
+				Hash:        tx.Hash,
+				TxIndex:     big.NewInt(int64(voutItem.TxIndex)),
+				TxType:      "hot_input",
+				FromAddress: "",
+				ToAddress:   voutItem.Address,
+				Amount:      voutItem.Amount.String(),
+				Timestamp:   uint64(time.Now().Unix()),
+			}
+			childTxn = append(childTxn, childTx)
 		}
 
 		for _, vinItem := range tx.VinList {
-			toAddressString += "|" + vinItem.Address
-			addressList := strings.Split(vinItem.Address, "|")
-			for _, addressItem := range addressList {
-				vinTx, _ := deposit.database.Vins.QueryVinByTxId(tx.BusinessId, addressItem, tx.Hash)
-				hotAmountString += "|" + vinTx.Amount.String()
+			childTx := database.ChildTxs{
+				GUID:        uuid.New(),
+				Hash:        tx.Hash,
+				TxIndex:     big.NewInt(int64(vinItem.Vout)),
+				TxType:      "cold_output",
+				FromAddress: "",
+				ToAddress:   vinItem.Address,
+				Amount:      vinItem.Amount.String(),
+				Timestamp:   uint64(time.Now().Unix()),
 			}
+			childTxn = append(childTxn, childTx)
 		}
 	}
 	internalTx := database.Internals{
@@ -389,11 +467,11 @@ func (deposit *Deposit) HandleInternalTx(tx *Transaction) (database.Internals, e
 		BlockHash:   "",
 		BlockNumber: tx.BlockNumber,
 		Hash:        tx.Hash,
-		Status:      1,
+		Status:      database.TxStatusSuccess,
 		Fee:         txFee,
 		Timestamp:   uint64(time.Now().Unix()),
 	}
-	return internalTx, nil
+	return internalTx, childTxn, nil
 }
 
 func (deposit *Deposit) HandleVin(tx *Transaction) ([]database.Vins, []database.TokenBalance, error) {
@@ -404,7 +482,7 @@ func (deposit *Deposit) HandleVin(tx *Transaction) ([]database.Vins, []database.
 			GUID:             uuid.New(),
 			Address:          vout.Address,
 			TxId:             tx.Hash,
-			Vout:             vout.N,
+			Vout:             vout.TxIndex,
 			Script:           "",
 			Witness:          "",
 			Amount:           vout.Amount,
@@ -457,7 +535,6 @@ func (deposit *Deposit) HandleVout(tx *Transaction, businessID string) (*Prepare
 				balanceList = append(balanceList, balanceItem)
 			}
 		}
-
 	}
 	return &PrepareVoutList{
 		TxId:        tx.Hash,

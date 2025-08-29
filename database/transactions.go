@@ -15,7 +15,7 @@ type Transactions struct {
 	LockTime    *big.Int `gorm:"serializer:u256"`
 	TxType      string   `json:"tx_type"`
 	Version     string   `json:"version"`
-	Status      uint8    `json:"status"`
+	Status      TxStatus `json:"status"`
 	Timestamp   uint64   `json:"timestamp"`
 }
 

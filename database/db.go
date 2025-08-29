@@ -30,6 +30,7 @@ type DB struct {
 	Transactions TransactionsDB
 	Vins         VinsDB
 	Vouts        VoutsDB
+	ChildTxs     ChildTxsDB
 }
 
 func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
@@ -76,6 +77,7 @@ func NewDB(ctx context.Context, dbConfig config.DBConfig) (*DB, error) {
 		Transactions: NewTransactionsDB(gorm),
 		Vins:         NewVinsDB(gorm),
 		Vouts:        NewVoutsDB(gorm),
+		ChildTxs:     NewChildTxsDB(gorm),
 	}
 	return db, nil
 }
@@ -95,6 +97,7 @@ func (db *DB) Transaction(fn func(db *DB) error) error {
 			Transactions: NewTransactionsDB(tx),
 			Vins:         NewVinsDB(tx),
 			Vouts:        NewVoutsDB(tx),
+			ChildTxs:     NewChildTxsDB(tx),
 		}
 		return fn(txDB)
 	})
