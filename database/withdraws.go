@@ -34,6 +34,7 @@ type WithdrawsDB interface {
 
 	StoreWithdraws(string, *Withdraws) error
 	UpdateWithdrawStatus(requestId string, status TxStatus, withdrawsList []Withdraws) error
+	UpdateWithdrawByGuuid(requestId string, transactionId string, txSignedHex string) error
 }
 
 type withdrawsDB struct {
@@ -85,6 +86,25 @@ func (db *withdrawsDB) UpdateWithdrawStatus(requestId string, status TxStatus, w
 
 		return nil
 	})
+}
+
+func (db *withdrawsDB) UpdateWithdrawByGuuid(requestId string, transactionId string, txSignedHex string) error {
+	tableName := fmt.Sprintf("withdraws_%s", requestId)
+	var withdrawItem Withdraws
+	result := db.gorm.Table(tableName).Where("guid = ?", transactionId).Take(&withdrawItem)
+	if result.Error != nil {
+		log.Error("query fail", "err", result.Error)
+	}
+
+	withdrawItem.TxSignHex = txSignedHex
+	withdrawItem.Status = TxStatusUnSent
+
+	err := db.gorm.Table(tableName).Save(withdrawItem).Error
+	if err != nil {
+		log.Error("update tx fail", "err", err)
+		return err
+	}
+	return nil
 }
 
 func (db *withdrawsDB) QueryNotifyWithdraws(requestId string) ([]Withdraws, error) {

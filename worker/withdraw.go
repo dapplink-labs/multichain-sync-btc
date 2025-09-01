@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -74,16 +75,19 @@ func (w *Withdraw) Start() error {
 					}
 					var balanceList []database.Balances
 					for _, unSendTransaction := range unSendTransactionList {
-						//bAddressList := strings.Split(unSendTransaction.FromAddress, "|")
-						//bAmountList := strings.Split(unSendTransaction.Amount, "|")
-						//for index, _ := range bAddressList {
-						//	lockBalance, _ := new(big.Int).SetString(bAmountList[index], 10)
-						//	balanceItem := database.Balances{
-						//		Address:     bAddressList[index],
-						//		LockBalance: lockBalance,
-						//	}
-						//	balanceList = append(balanceList, balanceItem)
-						//}
+						childTxList, err := w.db.ChildTxs.QueryChildTxnByTxId(businessId.BusinessUid, unSendTransaction.Guid.String())
+						if err != nil {
+							log.Error("query child tx fail", "err", err)
+							return err
+						}
+						for _, childTx := range childTxList {
+							lockBalance, _ := new(big.Int).SetString(childTx.Amount, 10)
+							balanceItem := database.Balances{
+								Address:     childTx.FromAddress,
+								LockBalance: lockBalance,
+							}
+							balanceList = append(balanceList, balanceItem)
+						}
 						txHash, err := w.rpcClient.SendTx(unSendTransaction.TxSignHex)
 						if err != nil {
 							log.Error("send transaction fail", "err", err)

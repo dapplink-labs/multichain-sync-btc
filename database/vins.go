@@ -23,6 +23,7 @@ type Vins struct {
 
 type VinsView interface {
 	QueryVinByTxId(string, string, string) (*Vins, error)
+	QueryVinsByAddress(string, string) ([]Vins, error)
 }
 
 type VinsDB interface {
@@ -50,6 +51,18 @@ func (vin vinsDB) QueryVinByTxId(businessId string, address string, txId string)
 		return nil, err
 	}
 	return &vinEntry, nil
+}
+
+func (vin vinsDB) QueryVinsByAddress(businessId string, address string) ([]Vins, error) {
+	var vinsEntry []Vins
+	err := vin.gorm.Table("vins_"+businessId).Where("address = ?", address).Find(&vinsEntry).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return nil, err
+	}
+	return vinsEntry, nil
 }
 
 func (vin vinsDB) StoreVins(businessId string, vins []Vins) error {

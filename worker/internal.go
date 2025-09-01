@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dapplink-labs/multichain-sync-btc/common/retry"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -72,16 +73,26 @@ func (w *Internal) Start() error {
 					}
 					var balanceList []database.Balances
 					for _, unSendInternalTx := range unSendInternalTxList {
-						//bAddressList := strings.Split(unSendInternalTx.FromAddress, "|")
-						//bAmountList := strings.Split(unSendInternalTx.Amount, "|")
-						//for index, _ := range bAddressList {
-						//	lockBalance, _ := new(big.Int).SetString(bAmountList[index], 10)
-						//	balanceItem := database.Balances{
-						//		Address:     bAddressList[index],
-						//		LockBalance: lockBalance,
-						//	}
-						//	balanceList = append(balanceList, balanceItem)
-						//}
+						childTxList, err := w.db.ChildTxs.QueryChildTxnByTxId(businessId.BusinessUid, unSendInternalTx.Guid.String())
+						if err != nil {
+							log.Error("query child tx fail", "err", err)
+							return err
+						}
+						for _, childTx := range childTxList {
+							lockBalance, _ := new(big.Int).SetString(childTx.Amount, 10)
+							balanceItem := database.Balances{
+								Address:     childTx.FromAddress,
+								AddressType: 0,
+								LockBalance: lockBalance,
+							}
+							balanceList = append(balanceList, balanceItem)
+							balanceItem1 := database.Balances{
+								Address:     childTx.ToAddress,
+								AddressType: 1,
+								LockBalance: lockBalance,
+							}
+							balanceList = append(balanceList, balanceItem1)
+						}
 						txHash, err := w.rpcClient.SendTx(unSendInternalTx.TxSignHex)
 						if err != nil {
 							log.Error("send transaction fail", "err", err)

@@ -64,8 +64,9 @@ message UnSignWithdrawTransactionRequest {
 }
 
 message ReturnTransactionHashes {
-  string transaction_uuid = 4;
-  string un_sign_tx = 5;
+  string transaction_uuid = 1;
+  string un_sign_tx = 2;
+  string tx_data = 3;
 }
 
 message UnSignWithdrawTransactionResponse {
@@ -77,7 +78,7 @@ message UnSignWithdrawTransactionResponse {
 message SignedTransactions {
   string transaction_uuid = 1;
   string signature = 2;
-  string tx_type = 3;
+  string tx_data = 3;
 }
 
 message SignedWithdrawTransactionRequest {

@@ -21,6 +21,7 @@ type ChildTxs struct {
 }
 
 type ChildTxsView interface {
+	QueryChildTxnByTxId(string, string) ([]ChildTxs, error)
 }
 
 type ChildTxsDB interface {
@@ -44,4 +45,14 @@ func (c childTxsDB) StoreChildTxs(businessId string, txs []ChildTxs) error {
 		return err
 	}
 	return nil
+}
+
+func (c childTxsDB) QueryChildTxnByTxId(businessId string, txId string) ([]ChildTxs, error) {
+	var childTxList []ChildTxs
+	err := c.gorm.Table("child_txs_"+businessId).Where("tx_id = ?", txId).Find(&childTxList).Error
+	if err != nil {
+		log.Error("query child txn fail", "err", err)
+		return nil, err
+	}
+	return childTxList, nil
 }
